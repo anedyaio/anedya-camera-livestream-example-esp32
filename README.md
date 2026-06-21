@@ -9,7 +9,7 @@
 
 ![Camera View](./media/camera_view.png)
 
-Turn an AI Thinker ESP32-CAM into a real-time camera livestream device using Anedya for signaling and TURN relay provisioning, and WebRTC DataChannel for low-latency video delivery.
+Turn an ESP32-CAM into a real-time camera livestream device using Anedya for signaling and TURN relay provisioning, and WebRTC DataChannel for low-latency video delivery.
 
 ## ✨ Features
 
@@ -87,7 +87,7 @@ This project does not use WebRTC RTP video tracks. Instead, camera JPEG frames a
 ### What You Need
 
 **Hardware**
-- AI Thinker ESP32-CAM (OV2640 or OV3660 camera module)
+- ESP32-CAM (OV2640 or OV3660 camera module)
 - USB-to-serial programmer (e.g. FTDI, CP2102) to flash the board
 
 **Software / Accounts**
@@ -202,7 +202,7 @@ Enable `CONFIG_DATACHANNEL_TEST_MODE` in menuconfig to skip camera init entirely
 
 ## 🔧 Hardware
 
-### Board — AI Thinker ESP32-CAM
+### Board — ESP32-CAM
 
 | Property | Value |
 |---|---|
@@ -227,7 +227,7 @@ Enable `CONFIG_DATACHANNEL_TEST_MODE` in menuconfig to skip camera init entirely
 | JPEG | Hardware encoder onboard |
 | XCLK | 20 MHz |
 
-### Pin Map (AI Thinker)
+### Pin Map
 
 | Signal | GPIO |
 |---|---|
@@ -245,7 +245,7 @@ Enable `CONFIG_DATACHANNEL_TEST_MODE` in menuconfig to skip camera init entirely
 
 | Board | Link |
 |---|---|
-| AI Thinker ESP32-CAM | [Official product page](https://vdoc.ai-thinker.com/en/esp32-cam) · [Amazon](https://www.amazon.com/esp32-cam-ai-thinker/s?k=esp32+cam+ai+thinker) · [DigiKey](https://www.digikey.com/en/products/detail/universal-solder-electronics-ltd/Ai-Thinker-ESP32-CAM-WiFi-BT-BLE/14319899) |
+| ESP32-CAM | [Official product page](https://vdoc.ai-thinker.com/en/esp32-cam) · [Amazon](https://www.amazon.com/esp32-cam-ai-thinker/s?k=esp32+cam+ai+thinker) · [DigiKey](https://www.digikey.com/en/products/detail/universal-solder-electronics-ltd/Ai-Thinker-ESP32-CAM-WiFi-BT-BLE/14319899) |
 | DFRobot ESP32-S3 AI Camera (DFR1154) | [DFRobot store](https://www.dfrobot.com/product-2899.html) · [Wiki / docs](https://wiki.dfrobot.com/SKU_DFR1154_ESP32_S3_AI_CAM) |
 
 ---
