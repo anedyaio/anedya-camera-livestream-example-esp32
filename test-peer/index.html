@@ -1,0 +1,631 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ESP Peer Handshake Test</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0b0d10;
+      color: #eef2f7;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    main {
+      width: min(960px, 100%);
+      margin: 0 auto;
+      display: grid;
+      gap: 16px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 700;
+    }
+
+    .panel {
+      background: #151922;
+      border: 1px solid #2a3140;
+      border-radius: 8px;
+      padding: 16px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .panel[hidden] {
+      display: none;
+    }
+
+    .settings-panel {
+      display: block;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    .settings-panel summary {
+      cursor: pointer;
+      padding: 14px 16px;
+      color: #dbe5f4;
+      font-weight: 700;
+      user-select: none;
+    }
+
+    .settings-panel summary::marker {
+      color: #94a3b8;
+    }
+
+    .settings-body {
+      border-top: 1px solid #2a3140;
+      padding: 16px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .controls-panel {
+      padding: 14px 16px;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      font-size: 13px;
+      color: #b8c0cc;
+    }
+
+    input,
+    select {
+      box-sizing: border-box;
+      width: 100%;
+      border: 1px solid #354052;
+      background: #0f131a;
+      color: #eef2f7;
+      border-radius: 6px;
+      padding: 10px 12px;
+      font: inherit;
+    }
+
+    .row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .controls-row {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(150px, 190px));
+      justify-content: center;
+      gap: 12px;
+      width: 100%;
+    }
+
+    button {
+      border: 0;
+      border-radius: 6px;
+      min-height: 46px;
+      padding: 10px 18px;
+      font: inherit;
+      font-weight: 700;
+      color: white;
+      background: #2563eb;
+      cursor: pointer;
+      text-align: center;
+      transition: background-color 140ms ease, transform 140ms ease;
+    }
+
+    button:hover:not(:disabled) {
+      transform: translateY(-1px);
+    }
+
+    button.secondary {
+      background: #374151;
+    }
+
+    button.stop {
+      background: #dc2626;
+    }
+
+    button:disabled {
+      background: #2b3140;
+      color: #7d8796;
+      cursor: not-allowed;
+    }
+
+    #status {
+      display: inline-flex;
+      width: fit-content;
+      border-radius: 999px;
+      padding: 6px 10px;
+      background: #272f3f;
+      color: #dbe5f4;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    #status.ok {
+      background: #14532d;
+      color: #bbf7d0;
+    }
+
+    #status.err {
+      background: #5f1212;
+      color: #fecaca;
+    }
+
+    pre {
+      margin: 0;
+      min-height: 260px;
+      max-height: 420px;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 12px;
+      line-height: 1.5;
+      color: #cbd5e1;
+    }
+
+    #preview {
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      object-fit: contain;
+      image-rendering: auto;
+      transform: scaleY(-1);
+      background: #05070a;
+      border: 1px solid #354052;
+      border-radius: 8px;
+      display: none;
+    }
+
+    .video-panel {
+      padding: 12px;
+      background: #0f131a;
+    }
+
+    @media (max-width: 640px) {
+      body {
+        padding: 16px;
+      }
+
+      button {
+        width: 100%;
+      }
+
+      .controls-row {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main>
+    <h1>ESP WebRTC Handshake Test</h1>
+    <div id="status">Idle</div>
+
+    <section class="panel video-panel" id="videoPanel" hidden>
+      <img id="preview" alt="ESP camera frame">
+    </section>
+
+    <details class="panel settings-panel" id="settingsPanel">
+      <summary>Settings</summary>
+      <div class="settings-body">
+        <label>
+          Anedya Node ID
+          <input id="namespaceId" autocomplete="off" placeholder="Node UUID">
+        </label>
+        <label>
+          Platform API Key
+          <input id="apiKey" autocomplete="off" type="password" placeholder="Bearer token or raw token">
+        </label>
+        <div class="row">
+          <button id="saveBtn" class="secondary" type="button">Save</button>
+        </div>
+      </div>
+    </details>
+
+    <section class="panel controls-panel">
+      <div class="controls-row">
+        <button id="startBtn" type="button">Start Handshake</button>
+        <button id="stopBtn" class="stop" type="button" disabled>Stop</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <pre id="log"></pre>
+    </section>
+  </main>
+
+  <script>
+    const API_BASE = "https://api.ap-in-1.anedya.io/v1";
+    const STORAGE = {
+      namespaceId: "esp-peer-test.namespaceId",
+      apiKey: "esp-peer-test.apiKey",
+    };
+
+    const statusEl = document.getElementById("status");
+    const logEl = document.getElementById("log");
+    const videoPanelEl = document.getElementById("videoPanel");
+    const previewEl = document.getElementById("preview");
+    const settingsPanelEl = document.getElementById("settingsPanel");
+    const namespaceIdEl = document.getElementById("namespaceId");
+    const apiKeyEl = document.getElementById("apiKey");
+    const saveBtn = document.getElementById("saveBtn");
+    const startBtn = document.getElementById("startBtn");
+    const stopBtn = document.getElementById("stopBtn");
+
+    let pc = null;
+    let dc = null;
+    let pollTimer = null;
+    let sessionId = null;
+    let lastFrameUrl = null;
+    let frameCount = 0;
+    let statsStartMs = 0;
+    let statsLastReportMs = 0;
+    let statsWindowFrames = 0;
+    let statsWindowBytes = 0;
+    let statsTotalBytes = 0;
+    const VERBOSE_FRAME_LOG = false;
+
+    namespaceIdEl.value = localStorage.getItem(STORAGE.namespaceId) || "";
+    apiKeyEl.value = localStorage.getItem(STORAGE.apiKey) || "";
+    settingsPanelEl.open = !namespaceIdEl.value || !apiKeyEl.value;
+
+    function log(message) {
+      const stamp = new Date().toLocaleTimeString();
+      logEl.textContent += `[${stamp}] ${message}\n`;
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function setStatus(text, kind = "") {
+      statusEl.textContent = text;
+      statusEl.className = kind;
+    }
+
+    function apiKey() {
+      const value = apiKeyEl.value.trim();
+      if (!value) throw new Error("Missing Platform API key");
+      return value.startsWith("Bearer ") ? value : `Bearer ${value}`;
+    }
+
+    function namespaceId() {
+      const value = namespaceIdEl.value.trim();
+      if (!value) throw new Error("Missing Anedya Node ID");
+      return value;
+    }
+
+    function headers() {
+      return {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "Authorization": apiKey(),
+      };
+    }
+
+    function namespace() {
+      return { scope: "node", id: namespaceId() };
+    }
+
+    async function vsSet(key, value) {
+      const response = await fetch(`${API_BASE}/valuestore/setValue`, {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({
+          namespace: namespace(),
+          key,
+          value,
+          type: "string",
+        }),
+      });
+      if (!response.ok) {
+        throw new Error(`ValueStore set ${key} failed: ${response.status} ${await response.text()}`);
+      }
+    }
+
+    async function fetchTurnCredentials() {
+      const resp = await fetch(`${API_BASE}/relay/create`, {
+        method: 'POST',
+        headers: headers(),
+        body: JSON.stringify({ relayType: 'turn' }),
+      });
+      if (!resp.ok) throw new Error(`TURN fetch failed: ${resp.status}`);
+      const json = await resp.json();
+      if (!json.relayData) throw new Error(json.error || 'no relayData');
+      return {
+        ...json.relayData,
+        password: json.relayData.credential,
+        relayExpiry: json.relayExpiry,
+      };
+    }
+
+    async function vsGet(key) {
+      const response = await fetch(`${API_BASE}/valuestore/getValue`, {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({
+          namespace: namespace(),
+          key,
+        }),
+      });
+      if (!response.ok) return null;
+      const data = await response.json();
+      if (data.value === undefined || data.value === null || data.value === "") return null;
+      return typeof data.value === "string" ? data.value : JSON.stringify(data.value);
+    }
+
+    function parseAnswer(value) {
+      try {
+        const parsed = JSON.parse(value);
+        if (parsed.sdp && parsed.type) return parsed;
+      } catch (_) {
+      }
+      return { type: "answer", sdp: value };
+    }
+
+    function waitForIceGatheringComplete(peerConnection, timeoutMs = 15000) {
+      if (peerConnection.iceGatheringState === "complete") return Promise.resolve();
+      return new Promise((resolve) => {
+        const timeout = setTimeout(resolve, timeoutMs);
+        peerConnection.addEventListener("icegatheringstatechange", () => {
+          if (peerConnection.iceGatheringState === "complete") {
+            clearTimeout(timeout);
+            resolve();
+          }
+        });
+      });
+    }
+
+    function stop() {
+      if (pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+      }
+      if (dc) {
+        dc.close();
+        dc = null;
+      }
+      if (pc) {
+        pc.close();
+        pc = null;
+      }
+      if (lastFrameUrl) {
+        URL.revokeObjectURL(lastFrameUrl);
+        lastFrameUrl = null;
+      }
+      previewEl.removeAttribute("src");
+      previewEl.style.display = "none";
+      videoPanelEl.hidden = true;
+      frameCount = 0;
+      statsStartMs = 0;
+      statsLastReportMs = 0;
+      statsWindowFrames = 0;
+      statsWindowBytes = 0;
+      statsTotalBytes = 0;
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+      setStatus("Stopped");
+      log("Stopped");
+    }
+
+    saveBtn.addEventListener("click", () => {
+      localStorage.setItem(STORAGE.namespaceId, namespaceIdEl.value.trim());
+      localStorage.setItem(STORAGE.apiKey, apiKeyEl.value.trim());
+      settingsPanelEl.open = false;
+      log("Settings saved");
+    });
+
+    stopBtn.addEventListener("click", stop);
+
+    startBtn.addEventListener("click", async () => {
+      try {
+        logEl.textContent = "";
+        setStatus("Creating offer...");
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+
+        sessionId = Math.random().toString(36).slice(2, 10);
+        const offerKey = `offer_${sessionId}`;
+        const answerKey = `answer_${sessionId}`;
+
+        const iceServers = [{ urls: "stun:turn1.ap-in-1.anedya.io:3478" }];
+        let turnCreds = null;
+        try {
+          turnCreds = await fetchTurnCredentials();
+          iceServers.push({
+            urls: "turn:turn1.ap-in-1.anedya.io:3478",
+            username: turnCreds.username,
+            credential: turnCreds.password,
+          });
+          log("Fetched Anedya TURN credentials");
+        } catch (error) {
+          log(`TURN fetch failed, continuing with STUN only: ${error.message}`);
+        }
+
+        const ICE_TRANSPORT_POLICY = "all";
+        pc = new RTCPeerConnection({
+          iceServers,
+          iceTransportPolicy: ICE_TRANSPORT_POLICY,
+        });
+        log(`Using ${iceServers.length} ICE server(s) for WebRTC (policy=${ICE_TRANSPORT_POLICY})`);
+
+        dc = pc.createDataChannel("jpeg-test", {
+          ordered: false,
+          maxRetransmits: 0,
+        });
+        dc.binaryType = "arraybuffer";
+        log("Created unordered/unreliable data channel for live JPEG");
+
+        dc.onopen = () => {
+          setStatus("Data channel open", "ok");
+          log("SUCCESS: data channel opened. WebRTC handshake works.");
+          dc.send("browser handshake test ping");
+        };
+
+        dc.onclose = () => log("Data channel closed");
+        dc.onerror = (event) => log(`Data channel error: ${event.error || "unknown"}`);
+        function recordJpegStats(byteLength) {
+          const now = performance.now();
+          if (!statsStartMs) {
+            statsStartMs = now;
+            statsLastReportMs = now;
+          }
+
+          statsWindowFrames += 1;
+          statsWindowBytes += byteLength;
+          statsTotalBytes += byteLength;
+
+          const windowSeconds = (now - statsLastReportMs) / 1000;
+          if (windowSeconds < 5 && statsWindowFrames < 25) return;
+
+          const fps = statsWindowFrames / Math.max(windowSeconds, 0.001);
+          const kbps = (statsWindowBytes * 8) / Math.max(windowSeconds, 0.001) / 1000;
+          const avgBytes = statsWindowBytes / statsWindowFrames;
+          const totalSeconds = (now - statsStartMs) / 1000;
+          const totalFps = frameCount / Math.max(totalSeconds, 0.001);
+
+          log(`STATS: delivered=${fps.toFixed(2)} fps avg=${Math.round(avgBytes)} bytes throughput=${kbps.toFixed(1)} kbps total=${totalFps.toFixed(2)} fps`);
+          log(`ESTIMATE: at this payload rate, 3KB=${(statsWindowBytes / windowSeconds / 3000).toFixed(1)} fps, 6KB=${(statsWindowBytes / windowSeconds / 6000).toFixed(1)} fps, 12KB=${(statsWindowBytes / windowSeconds / 12000).toFixed(1)} fps`);
+
+          statsLastReportMs = now;
+          statsWindowFrames = 0;
+          statsWindowBytes = 0;
+        }
+
+        dc.onmessage = (event) => {
+          const data = event.data;
+          if (data instanceof ArrayBuffer) {
+            frameCount += 1;
+            recordJpegStats(data.byteLength);
+            const blob = new Blob([data], { type: "image/jpeg" });
+            const nextUrl = URL.createObjectURL(blob);
+            previewEl.src = nextUrl;
+            videoPanelEl.hidden = false;
+            previewEl.style.display = "block";
+            if (lastFrameUrl) URL.revokeObjectURL(lastFrameUrl);
+            lastFrameUrl = nextUrl;
+            if (VERBOSE_FRAME_LOG || frameCount <= 5 || frameCount % 30 === 0) {
+              log(`Received JPEG frame #${frameCount}: ${data.byteLength} bytes`);
+            }
+          } else if (data instanceof Blob) {
+            frameCount += 1;
+            recordJpegStats(data.size);
+            const nextUrl = URL.createObjectURL(data);
+            previewEl.src = nextUrl;
+            videoPanelEl.hidden = false;
+            previewEl.style.display = "block";
+            if (lastFrameUrl) URL.revokeObjectURL(lastFrameUrl);
+            lastFrameUrl = nextUrl;
+            if (VERBOSE_FRAME_LOG || frameCount <= 5 || frameCount % 30 === 0) {
+              log(`Received JPEG frame #${frameCount}: ${data.size} bytes`);
+            }
+          } else {
+            log(`Received text message: ${data}`);
+          }
+        };
+
+        async function logSelectedCandidatePair() {
+          const stats = await pc.getStats();
+          for (const report of stats.values()) {
+            if (report.type === "transport" && report.selectedCandidatePairId) {
+              const pair = stats.get(report.selectedCandidatePairId);
+              if (!pair) continue;
+              const local = stats.get(pair.localCandidateId);
+              const remote = stats.get(pair.remoteCandidateId);
+              log(`Selected pair: local=${local?.candidateType} remote=${remote?.candidateType} ` +
+                  `(${local?.address}:${local?.port} -> ${remote?.address}:${remote?.port})`);
+              if (local?.candidateType === "relay" || remote?.candidateType === "relay") {
+                log("CONFIRMED: traffic is flowing through TURN relay");
+              } else {
+                log("Traffic is NOT using relay (host/srflx direct path)");
+              }
+            }
+          }
+        }
+
+        pc.onconnectionstatechange = () => {
+          log(`PC connectionState: ${pc.connectionState}`);
+          if (pc.connectionState === "connected") {
+            setStatus("Peer connected", "ok");
+            logSelectedCandidatePair();
+          }
+          if (pc.connectionState === "failed") setStatus("Peer failed", "err");
+        };
+
+        pc.oniceconnectionstatechange = () => log(`ICE connectionState: ${pc.iceConnectionState}`);
+        pc.onicegatheringstatechange = () => log(`ICE gatheringState: ${pc.iceGatheringState}`);
+        pc.onsignalingstatechange = () => log(`Signaling state: ${pc.signalingState}`);
+
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        log("Waiting for browser ICE gathering...");
+        await waitForIceGatheringComplete(pc);
+
+        const rawOfferSdp = pc.localDescription.sdp;
+        const offerSdp = rawOfferSdp.replaceAll("a=setup:actpass", "a=setup:passive");
+        log(`Local offer SDP length: ${offerSdp.length} chars`);
+        if (offerSdp !== rawOfferSdp) {
+          log("Forced offer DTLS setup:passive so ESP initiates DTLS");
+        }
+        const offerPayload = JSON.stringify({
+          type: "offer",
+          sdp: offerSdp,
+          // Piggyback our already-fetched TURN credentials so ESP can use the
+          // same relay without calling the Anedya platform API itself (it
+          // would need a platform API key embedded in firmware to do that).
+          turn: turnCreds ? { username: turnCreds.username, credential: turnCreds.password } : null,
+        });
+        await vsSet(offerKey, offerPayload);
+        log(`Wrote JSON SDP offer to ${offerKey}`);
+        log(`Polling ${answerKey} every 2 seconds...`);
+        setStatus("Waiting for ESP answer...");
+
+        let attempts = 0;
+        pollTimer = setInterval(async () => {
+          attempts += 1;
+          if (!pc || pc.signalingState === "closed") return;
+          if (attempts > 45) {
+            setStatus("Timed out waiting for answer", "err");
+            log("Timed out after 90 seconds");
+            stop();
+            return;
+          }
+
+          try {
+            const answerValue = await vsGet(answerKey);
+            if (!answerValue) {
+              log(`No answer yet (${attempts})`);
+              return;
+            }
+
+            clearInterval(pollTimer);
+            pollTimer = null;
+            log(`Read ${answerKey}: ${answerValue.length} chars`);
+            const setupLine = answerValue.match(/^a=setup:.+$/m)?.[0];
+            if (setupLine) log(`ESP answer ${setupLine}`);
+
+            const answer = parseAnswer(answerValue);
+            await pc.setRemoteDescription(new RTCSessionDescription(answer));
+            log("Applied ESP answer. Waiting for ICE/DTLS/data channel...");
+            setStatus("Connecting...");
+          } catch (error) {
+            log(`Poll/apply answer error: ${error.message}`);
+          }
+        }, 2000);
+      } catch (error) {
+        setStatus("Error", "err");
+        log(`Error: ${error.message}`);
+        stopBtn.disabled = true;
+        startBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+
+</html>

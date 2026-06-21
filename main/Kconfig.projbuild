@@ -1,0 +1,248 @@
+menu "Anedya WebRTC Camera"
+    config ANEDYA_DEVICE_ID
+        string "Anedya Device ID"
+        default ""
+        help
+            UUID of this device from the Anedya console (Settings → Device).
+
+    config ANEDYA_NODE_ID
+        string "Anedya Node ID"
+        default ""
+        help
+            UUID of the node this device belongs to (shown in viewer.html QR).
+
+    config ANEDYA_CONNECTION_KEY
+        string "Anedya Connection Key"
+        default ""
+        help
+            Device connection key from the Anedya console.
+
+    menu "Board Selection"
+        choice BOARD_TYPE
+            prompt "Development board"
+            default BOARD_ESP32CAM_AITHINKER
+            help
+                Select your ESP32 camera development board. This sets the GPIO
+                pin map used for the camera interface. Choose "Custom" to enter
+                pins manually.
+
+            config BOARD_ESP32CAM_AITHINKER
+                bool "AI Thinker ESP32-CAM"
+            config BOARD_WROVER_KIT
+                bool "ESP-WROVER-KIT"
+            config BOARD_FREENOVE_WROVER
+                bool "Freenove ESP32-Wrover CAM"
+            config BOARD_ESP_EYE
+                bool "ESP-EYE (ESP32)"
+            config BOARD_ESP32S3_EYE
+                bool "ESP32-S3-EYE"
+                depends on IDF_TARGET_ESP32S3
+            config BOARD_XIAO_ESP32S3
+                bool "Seeed XIAO ESP32-S3 Sense"
+                depends on IDF_TARGET_ESP32S3
+            config BOARD_DFROBOT_ESP32S3
+                bool "DFRobot ESP32-S3 AI Camera (DFR1154)"
+                depends on IDF_TARGET_ESP32S3
+            config BOARD_M5STACK_CAMERA_A
+                bool "M5Stack Camera Model A"
+            config BOARD_M5STACK_CAMERA_B
+                bool "M5Stack Camera Model B"
+            config BOARD_TTGO_T_CAMERA
+                bool "TTGO T-Camera (with PIR)"
+            config BOARD_TTGO_T_CAMERA_PLUS
+                bool "TTGO T-Camera Plus"
+            config BOARD_TTGO_T_JOURNAL
+                bool "TTGO T-Journal"
+            config BOARD_CUSTOM
+                bool "Custom (enter pins manually)"
+        endchoice
+
+        menu "Custom Pin Configuration"
+            depends on BOARD_CUSTOM
+
+            config CUSTOM_BOARD_HAS_PSRAM
+                bool "Board has PSRAM"
+                default n
+
+            config CUSTOM_CAM_PIN_PWDN
+                int "PWDN pin (-1 = not used)"
+                default -1
+                range -1 48
+            config CUSTOM_CAM_PIN_RESET
+                int "RESET pin (-1 = not used)"
+                default -1
+                range -1 48
+            config CUSTOM_CAM_PIN_XCLK
+                int "XCLK pin"
+                default 0
+                range 0 48
+            config CUSTOM_CAM_PIN_SIOD
+                int "SIOD (SDA) pin"
+                default 26
+                range 0 48
+            config CUSTOM_CAM_PIN_SIOC
+                int "SIOC (SCL) pin"
+                default 27
+                range 0 48
+            config CUSTOM_CAM_PIN_D7
+                int "D7 pin"
+                default 35
+                range 0 48
+            config CUSTOM_CAM_PIN_D6
+                int "D6 pin"
+                default 34
+                range 0 48
+            config CUSTOM_CAM_PIN_D5
+                int "D5 pin"
+                default 39
+                range 0 48
+            config CUSTOM_CAM_PIN_D4
+                int "D4 pin"
+                default 36
+                range 0 48
+            config CUSTOM_CAM_PIN_D3
+                int "D3 pin"
+                default 21
+                range 0 48
+            config CUSTOM_CAM_PIN_D2
+                int "D2 pin"
+                default 19
+                range 0 48
+            config CUSTOM_CAM_PIN_D1
+                int "D1 pin"
+                default 18
+                range 0 48
+            config CUSTOM_CAM_PIN_D0
+                int "D0 pin"
+                default 5
+                range 0 48
+            config CUSTOM_CAM_PIN_VSYNC
+                int "VSYNC pin"
+                default 25
+                range 0 48
+            config CUSTOM_CAM_PIN_HREF
+                int "HREF pin"
+                default 23
+                range 0 48
+            config CUSTOM_CAM_PIN_PCLK
+                int "PCLK pin"
+                default 22
+                range 0 48
+        endmenu
+    endmenu
+
+    menu "Camera Settings"
+        choice CAMERA_STREAM_FRAMESIZE
+            prompt "Frame size"
+            default CAMERA_FRAMESIZE_HVGA
+            help
+                Sensor output resolution. HVGA (480x320) is the fastest on OV3660
+                at 32.6 FPS. Larger sizes reduce sensor FPS and increase frame bytes.
+
+            config CAMERA_FRAMESIZE_96X96
+                bool "96x96"
+            config CAMERA_FRAMESIZE_QQVGA
+                bool "QQVGA (160x120)"
+            config CAMERA_FRAMESIZE_QVGA
+                bool "QVGA (320x240)"
+            config CAMERA_FRAMESIZE_HVGA
+                bool "HVGA (480x320) — fastest on OV3660"
+            config CAMERA_FRAMESIZE_VGA
+                bool "VGA (640x480)"
+            config CAMERA_FRAMESIZE_SVGA
+                bool "SVGA (800x600)"
+            config CAMERA_FRAMESIZE_HD
+                bool "HD (1280x720)"
+        endchoice
+
+        config CAMERA_JPEG_QUALITY
+            int "JPEG quality (0=best/largest, 63=worst/smallest)"
+            default 25
+            range 0 63
+            help
+                OV3660 hardware JPEG encoder quantization setting.
+                Lower = better image quality but larger frame bytes = lower FPS.
+                Higher = blockier image but smaller frames = higher FPS.
+                Typical values: 10 (~6KB), 25 (~3-4KB), 40 (~2KB).
+
+        config CAMERA_FB_COUNT
+            int "Frame buffer count"
+            default 2
+            range 1 4
+            help
+                Number of PSRAM frame buffers. With 2+, I2S DMA runs continuously
+                (double speed mode). 1 = stop/start DMA per frame (lower throughput).
+                2 is the recommended minimum for live streaming.
+
+        config CAMERA_STREAM_FPS
+            int "Target stream FPS"
+            default 20
+            range 1 30
+            help
+                Software rate limiter for the JPEG stream task. Sets how often
+                a frame is captured and queued for DataChannel transmission.
+                The actual delivered FPS at the browser is limited by DataChannel
+                bandwidth: ~600 kbps / frame_bytes_per_second.
+    endmenu
+
+    menu "WebRTC DataChannel Tuning"
+        config WEBRTC_SEND_CACHE_SIZE
+            int "SCTP send cache size (bytes)"
+            default 8192
+            range 2048 65536
+            help
+                SCTP send buffer — how many bytes of outgoing data SCTP holds
+                while waiting for the peer receive window and congestion window.
+                Must be >= 1 max frame size or every send hits WOULD_BLOCK.
+                At quality=25 frames are ~3-4KB so 8192 fits one frame with slack.
+                Larger = more frames can queue = higher latency bursts.
+
+        config WEBRTC_RECV_CACHE_SIZE
+            int "SCTP receive cache size (bytes)"
+            default 2048
+            range 512 16384
+            help
+                SCTP receive buffer advertised to the browser as a_rwnd.
+                Browser only sends small control strings so 2048 is sufficient.
+
+        config WEBRTC_CACHE_TIMEOUT_MS
+            int "DataChannel frame discard timeout (ms)"
+            default 50
+            range 10 5000
+            help
+                How long esp_peer keeps a frame in the send cache before
+                discarding it as stale. Set to one frame period (1000/FPS)
+                to prevent old frames queuing up and causing latency spikes.
+                Default 5000ms would let 100 frames pile up at 20 FPS.
+
+        config WEBRTC_AGENT_RECV_TIMEOUT_MS
+            int "ICE agent receive timeout (ms)"
+            default 100
+            range 20 500
+            help
+                How long the ICE agent waits on recv() per loop tick.
+                20ms causes excessive STUN timeout errors on real WiFi.
+                100ms is the peer_demo recommendation. Only affects ICE
+                keepalive responsiveness, not video throughput.
+    endmenu
+
+    menu "DataChannel Test Mode"
+        config DATACHANNEL_TEST_MODE
+            bool "DataChannel test mode (no camera)"
+            default n
+            help
+                When enabled, skip camera init entirely and instead send a
+                counter message ("ping NNN from esp32") over the DataChannel
+                at a fixed interval. Use this to verify WebRTC signaling and
+                DataChannel connectivity without needing a working camera.
+
+        config DATACHANNEL_TEST_INTERVAL_MS
+            int "DataChannel test message interval (ms)"
+            default 500
+            range 50 10000
+            depends on DATACHANNEL_TEST_MODE
+            help
+                How often to send a test message when DataChannel test mode
+                is enabled.
+    endmenu
+endmenu

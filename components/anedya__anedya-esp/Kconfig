@@ -1,0 +1,30 @@
+menu "Anedya SDK Settings"
+    choice "Interface Selection"
+        prompt "Select interface for Anedya"
+        default AN_INTERFACE_ESP32_WIFI
+        config AN_INTERFACE_ESP32_WIFI
+            bool "ESP32 internal WiFi"
+        config AN_INTERFACE_ESP32_QUETEL
+            bool "ESP32 Quectel EC200U/G"
+        config  AN_INTERFACE_ESP32_WIFI_QUETEL
+            bool "ESP32 WiFi / Quectel_EC200U/G"
+    endchoice
+    choice "Connection Method"
+        prompt "Select protocol for connection with Anedya"
+        default CONN_ANEDYA_MQTT
+        config CONN_ANEDYA_MQTT
+            bool "MQTTS"
+        config CONN_ANEDYA_HTTPS
+            depends on AN_INTERFACE_ESP32_WIFI
+            bool "HTTPS"
+    endchoice
+    config AN_MAX_CONCURRENT_TXN
+        int "Max concurrent transactions"
+        default 10
+    config AN_TX_BUFFER
+        int "Anedya Tx Buffer Size(Bytes)"
+        default 1024
+    config AN_RX_BUFFER
+        int "Anedya Rx Buffer Size(Bytes)"
+        default 1024
+endmenu
