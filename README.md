@@ -9,12 +9,13 @@
 
 ![Camera View](./media/camera_view.png)
 
-Turn an ESP32-Camera board into a real-time camera livestream device with Anedya for low-latency video delivery.
+Turn an ESP32-Camera board into a real-time camera livestream device with Anedya (Commands and TURN relay).
 
 ## ✨ Features
 
-- **Live Video streaming :** Camera frames sent over WebRTC DataChannel.
 - **Signaling :** SDP offer/answer and ICE candidates exchanged via MQTT, no custom signaling server needed
+- **TURN Relay :** TURN server provided by Anedya to relay media streams.
+- **Live-Remote Video streaming :** Camera frames sent over WebRTC DataChannel.
 - **Realtime Audio Support :** Support for audio streaming over WebRTC DataChannel.
 
 ---
