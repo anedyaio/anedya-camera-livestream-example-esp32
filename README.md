@@ -20,7 +20,7 @@ Turn an ESP32-Camera board into a real-time camera livestream device with Anedya
 
 ---
 
-### Anedya - Camera Board Support
+### 📷 Anedya - Camera Board Support
 
 | Board | Support Status | Example Project | Product Link |
 |---|---|--|--|
