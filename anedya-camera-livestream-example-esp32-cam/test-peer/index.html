@@ -99,6 +99,17 @@
       flex-wrap: wrap;
     }
 
+    .checkbox-row {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .checkbox-row input {
+      width: auto;
+    }
+
     .controls-row {
       display: grid;
       grid-template-columns: repeat(2, minmax(150px, 190px));
@@ -225,6 +236,10 @@
           Platform API Key
           <input id="apiKey" autocomplete="off" type="password" placeholder="Bearer token or raw token">
         </label>
+        <label class="checkbox-row">
+          <input id="forceRelay" type="checkbox">
+          Force TURN relay (test relay path; browser sends relay-only candidates)
+        </label>
         <div class="row">
           <button id="saveBtn" class="secondary" type="button">Save</button>
         </div>
@@ -248,6 +263,7 @@
     const STORAGE = {
       namespaceId: "esp-peer-test.namespaceId",
       apiKey: "esp-peer-test.apiKey",
+      forceRelay: "esp-peer-test.forceRelay",
     };
 
     const statusEl = document.getElementById("status");
@@ -257,6 +273,7 @@
     const settingsPanelEl = document.getElementById("settingsPanel");
     const namespaceIdEl = document.getElementById("namespaceId");
     const apiKeyEl = document.getElementById("apiKey");
+    const forceRelayEl = document.getElementById("forceRelay");
     const saveBtn = document.getElementById("saveBtn");
     const startBtn = document.getElementById("startBtn");
     const stopBtn = document.getElementById("stopBtn");
@@ -264,7 +281,7 @@
     let pc = null;
     let dc = null;
     let pollTimer = null;
-    let sessionId = null;
+    let connectTimer = null;
     let lastFrameUrl = null;
     let frameCount = 0;
     let statsStartMs = 0;
@@ -276,6 +293,7 @@
 
     namespaceIdEl.value = localStorage.getItem(STORAGE.namespaceId) || "";
     apiKeyEl.value = localStorage.getItem(STORAGE.apiKey) || "";
+    forceRelayEl.checked = localStorage.getItem(STORAGE.forceRelay) === "true";
     settingsPanelEl.open = !namespaceIdEl.value || !apiKeyEl.value;
 
     function log(message) {
@@ -309,25 +327,6 @@
       };
     }
 
-    function namespace() {
-      return { scope: "node", id: namespaceId() };
-    }
-
-    async function vsSet(key, value) {
-      const response = await fetch(`${API_BASE}/valuestore/setValue`, {
-        method: "POST",
-        headers: headers(),
-        body: JSON.stringify({
-          namespace: namespace(),
-          key,
-          value,
-          type: "string",
-        }),
-      });
-      if (!response.ok) {
-        throw new Error(`ValueStore set ${key} failed: ${response.status} ${await response.text()}`);
-      }
-    }
 
     async function fetchTurnCredentials() {
       const resp = await fetch(`${API_BASE}/relay/create`, {
@@ -345,28 +344,103 @@
       };
     }
 
-    async function vsGet(key) {
-      const response = await fetch(`${API_BASE}/valuestore/getValue`, {
+    async function deflateRaw(str) {
+      const encoded = new TextEncoder().encode(str);
+      const cs = new CompressionStream("deflate-raw");
+      const writer = cs.writable.getWriter();
+      writer.write(encoded);
+      writer.close();
+      const chunks = [];
+      const reader = cs.readable.getReader();
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+      }
+      const total = chunks.reduce((n, c) => n + c.length, 0);
+      const buf = new Uint8Array(total);
+      let offset = 0;
+      for (const c of chunks) { buf.set(c, offset); offset += c.length; }
+      return buf;
+    }
+
+    function uint8ToBase64(buf) {
+      let binary = "";
+      for (let i = 0; i < buf.length; i++) binary += String.fromCharCode(buf[i]);
+      return btoa(binary);
+    }
+
+    function base64ToUint8(b64) {
+      const binary = atob(b64);
+      const buf = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) buf[i] = binary.charCodeAt(i);
+      return buf;
+    }
+
+    async function inflateRaw(buf) {
+      const ds = new DecompressionStream("deflate-raw");
+      const writer = ds.writable.getWriter();
+      writer.write(buf);
+      writer.close();
+      const chunks = [];
+      const reader = ds.readable.getReader();
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+      }
+      const total = chunks.reduce((n, c) => n + c.length, 0);
+      const out = new Uint8Array(total);
+      let offset = 0;
+      for (const c of chunks) { out.set(c, offset); offset += c.length; }
+      return new TextDecoder().decode(out);
+    }
+
+    // Send the WebRTC offer as the "webrtc_offer" command. The returned
+    // commandId is the correlation key: the ESP answers by attaching the SDP
+    // answer as this command's ackdata. Returns the commandId.
+    async function sendOfferViaCommand(offerPayload) {
+      const compressed = await deflateRaw(offerPayload);
+      const b64 = uint8ToBase64(compressed);
+      log(`Offer: raw=${offerPayload.length}B → deflate=${compressed.length}B → base64=${b64.length}B`);
+      if (b64.length > 950) {
+        throw new Error(`Compressed offer too large for command payload: ${b64.length} bytes (limit ~1000)`);
+      }
+      const response = await fetch(`${API_BASE}/commands/send`, {
         method: "POST",
         headers: headers(),
         body: JSON.stringify({
-          namespace: namespace(),
-          key,
+          nodeId: namespaceId(),
+          command: "webrtc_offer",
+          data: b64,
+          type: "string",
+          expiry: Date.now() + 300_000,
         }),
       });
-      if (!response.ok) return null;
-      const data = await response.json();
-      if (data.value === undefined || data.value === null || data.value === "") return null;
-      return typeof data.value === "string" ? data.value : JSON.stringify(data.value);
+      if (!response.ok) {
+        throw new Error(`Command send failed: ${response.status} ${await response.text()}`);
+      }
+      const json = await response.json();
+      // The send response carries the command id; field name has varied
+      // (commandId / id / commandID), so accept whichever is present.
+      const commandId = json.commandId || json.id || json.commandID;
+      if (!commandId) {
+        throw new Error(`Command send returned no id: ${JSON.stringify(json)}`);
+      }
+      log(`Command sent: commandId=${commandId}`);
+      return commandId;
     }
 
-    function parseAnswer(value) {
-      try {
-        const parsed = JSON.parse(value);
-        if (parsed.sdp && parsed.type) return parsed;
-      } catch (_) {
-      }
-      return { type: "answer", sdp: value };
+    // Poll a command's full details. Returns the command object including
+    // status, ackdata (base64 of deflate-raw answer SDP) and ackdatatype.
+    async function getCommandStatus(commandId) {
+      const response = await fetch(`${API_BASE}/commands/getDetails`, {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({ commandId }),
+      });
+      if (!response.ok) return null;
+      return await response.json();
     }
 
     function waitForIceGatheringComplete(peerConnection, timeoutMs = 15000) {
@@ -382,10 +456,16 @@
       });
     }
 
-    function stop() {
+    // keepStatus: when true, don't overwrite the status badge (the caller has
+    // already set an error/failure message that should stay visible).
+    function stop(keepStatus = false) {
       if (pollTimer) {
         clearInterval(pollTimer);
         pollTimer = null;
+      }
+      if (connectTimer) {
+        clearTimeout(connectTimer);
+        connectTimer = null;
       }
       if (dc) {
         dc.close();
@@ -410,18 +490,19 @@
       statsTotalBytes = 0;
       startBtn.disabled = false;
       stopBtn.disabled = true;
-      setStatus("Stopped");
+      if (!keepStatus) setStatus("Stopped");
       log("Stopped");
     }
 
     saveBtn.addEventListener("click", () => {
       localStorage.setItem(STORAGE.namespaceId, namespaceIdEl.value.trim());
       localStorage.setItem(STORAGE.apiKey, apiKeyEl.value.trim());
+      localStorage.setItem(STORAGE.forceRelay, forceRelayEl.checked ? "true" : "false");
       settingsPanelEl.open = false;
       log("Settings saved");
     });
 
-    stopBtn.addEventListener("click", stop);
+    stopBtn.addEventListener("click", () => stop());
 
     startBtn.addEventListener("click", async () => {
       try {
@@ -429,10 +510,6 @@
         setStatus("Creating offer...");
         startBtn.disabled = true;
         stopBtn.disabled = false;
-
-        sessionId = Math.random().toString(36).slice(2, 10);
-        const offerKey = `offer_${sessionId}`;
-        const answerKey = `answer_${sessionId}`;
 
         const iceServers = [{ urls: "stun:turn1.ap-in-1.anedya.io:3478" }];
         let turnCreds = null;
@@ -448,7 +525,16 @@
           log(`TURN fetch failed, continuing with STUN only: ${error.message}`);
         }
 
-        const ICE_TRANSPORT_POLICY = "all";
+        // "all" lets ICE pick the best path (direct srflx if possible, relay if
+        // not). "relay" forces the browser to send only relay candidates, so the
+        // only viable pair is browser-relay <-> esp-relay — use it to verify the
+        // TURN path end-to-end. The ESP stays on POLICY_ALL either way (its
+        // relay-only mode has no fallback and is fragile), but it still gathers a
+        // relay candidate, so relay pairing works.
+        const ICE_TRANSPORT_POLICY = forceRelayEl.checked ? "relay" : "all";
+        if (ICE_TRANSPORT_POLICY === "relay" && !turnCreds) {
+          throw new Error("Force-relay is on but TURN credentials could not be fetched");
+        }
         pc = new RTCPeerConnection({
           iceServers,
           iceTransportPolicy: ICE_TRANSPORT_POLICY,
@@ -485,13 +571,8 @@
           if (windowSeconds < 5 && statsWindowFrames < 25) return;
 
           const fps = statsWindowFrames / Math.max(windowSeconds, 0.001);
-          const kbps = (statsWindowBytes * 8) / Math.max(windowSeconds, 0.001) / 1000;
-          const avgBytes = statsWindowBytes / statsWindowFrames;
-          const totalSeconds = (now - statsStartMs) / 1000;
-          const totalFps = frameCount / Math.max(totalSeconds, 0.001);
 
-          log(`STATS: delivered=${fps.toFixed(2)} fps avg=${Math.round(avgBytes)} bytes throughput=${kbps.toFixed(1)} kbps total=${totalFps.toFixed(2)} fps`);
-          log(`ESTIMATE: at this payload rate, 3KB=${(statsWindowBytes / windowSeconds / 3000).toFixed(1)} fps, 6KB=${(statsWindowBytes / windowSeconds / 6000).toFixed(1)} fps, 12KB=${(statsWindowBytes / windowSeconds / 12000).toFixed(1)} fps`);
+          log(`FPS: ${fps.toFixed(1)}`);
 
           statsLastReportMs = now;
           statsWindowFrames = 0;
@@ -552,10 +633,18 @@
         pc.onconnectionstatechange = () => {
           log(`PC connectionState: ${pc.connectionState}`);
           if (pc.connectionState === "connected") {
+            if (connectTimer) { clearTimeout(connectTimer); connectTimer = null; }
             setStatus("Peer connected", "ok");
             logSelectedCandidatePair();
+          } else if (pc.connectionState === "failed") {
+            setStatus("Connection failed", "err");
+            log("Connection failed (ICE/DTLS could not be established)");
+            stop(true);
+          } else if (pc.connectionState === "disconnected") {
+            setStatus("Connection lost", "err");
+            log("Connection lost");
+            stop(true);
           }
-          if (pc.connectionState === "failed") setStatus("Peer failed", "err");
         };
 
         pc.oniceconnectionstatechange = () => log(`ICE connectionState: ${pc.iceConnectionState}`);
@@ -576,44 +665,89 @@
         const offerPayload = JSON.stringify({
           type: "offer",
           sdp: offerSdp,
-          // Piggyback our already-fetched TURN credentials so ESP can use the
-          // same relay without calling the Anedya platform API itself (it
-          // would need a platform API key embedded in firmware to do that).
           turn: turnCreds ? { username: turnCreds.username, credential: turnCreds.password } : null,
         });
-        await vsSet(offerKey, offerPayload);
-        log(`Wrote JSON SDP offer to ${offerKey}`);
-        log(`Polling ${answerKey} every 2 seconds...`);
+        const commandId = await sendOfferViaCommand(offerPayload);
+        log(`Sent compressed offer via Anedya command (id=${commandId})`);
+        log(`Polling command status every 2 seconds...`);
         setStatus("Waiting for ESP answer...");
 
         let attempts = 0;
+        let answerApplied = false;
         pollTimer = setInterval(async () => {
           attempts += 1;
           if (!pc || pc.signalingState === "closed") return;
+          // Once the answer is applied, the browser's own pc.connectionState is
+          // the source of truth; keep polling only to surface the ESP's final
+          // success/failure, but stop nagging the user about a missing answer.
           if (attempts > 45) {
-            setStatus("Timed out waiting for answer", "err");
-            log("Timed out after 90 seconds");
-            stop();
+            clearInterval(pollTimer);
+            pollTimer = null;
+            if (!answerApplied) {
+              setStatus("Timed out waiting for answer", "err");
+              log("Timed out after 90 seconds");
+              stop(true);
+            } else {
+              log("Stopped polling command status (answer already applied)");
+            }
             return;
           }
 
           try {
-            const answerValue = await vsGet(answerKey);
-            if (!answerValue) {
-              log(`No answer yet (${attempts})`);
+            const cmd = await getCommandStatus(commandId);
+            if (!cmd) {
+              log(`Status fetch failed (${attempts})`);
               return;
             }
 
-            clearInterval(pollTimer);
-            pollTimer = null;
-            log(`Read ${answerKey}: ${answerValue.length} chars`);
-            const setupLine = answerValue.match(/^a=setup:.+$/m)?.[0];
-            if (setupLine) log(`ESP answer ${setupLine}`);
+            // The ESP concludes the command "failure" if anything fails
+            // (bad offer, deflate error, or the WebRTC connection failing).
+            if (cmd.status === "failure") {
+              clearInterval(pollTimer);
+              pollTimer = null;
+              const reason = cmd.ackdata || cmd.error || "";
+              setStatus("ESP reported failure", "err");
+              log(`Command status=failure: ${reason}`);
+              stop(true);
+              return;
+            }
 
-            const answer = parseAnswer(answerValue);
-            await pc.setRemoteDescription(new RTCSessionDescription(answer));
-            log("Applied ESP answer. Waiting for ICE/DTLS/data channel...");
-            setStatus("Connecting...");
+            // The ESP concludes "success" once its data channel is connected.
+            if (cmd.status === "success") {
+              clearInterval(pollTimer);
+              pollTimer = null;
+              log("Command status=success (ESP confirmed data channel)");
+              return;
+            }
+
+            // The answer SDP rides in ackdata while status is "processing".
+            // Apply it once, then keep polling for the terminal success/failure.
+            if (!answerApplied && cmd.ackdata) {
+              answerApplied = true;
+              const answerSdp = await inflateRaw(base64ToUint8(cmd.ackdata));
+              log(`Answer ackdata: base64=${cmd.ackdata.length}B → sdp=${answerSdp.length} chars`);
+              const setupLine = answerSdp.match(/^a=setup:.+$/m)?.[0];
+              if (setupLine) log(`ESP answer ${setupLine}`);
+
+              await pc.setRemoteDescription(
+                new RTCSessionDescription({ type: "answer", sdp: answerSdp }));
+              log("Applied ESP answer. Waiting for ICE/DTLS/data channel...");
+              setStatus("Connecting...");
+
+              // Watchdog: answer applied but if ICE/DTLS never completes (e.g.
+              // same-LAN hairpin), pc.connectionState can hang on "connecting"
+              // forever. Fail loudly after a grace period.
+              connectTimer = setTimeout(() => {
+                connectTimer = null;
+                if (pc && pc.connectionState !== "connected") {
+                  setStatus("Connection timed out", "err");
+                  log(`Connection timed out (state=${pc.connectionState}) — could not establish ICE/DTLS`);
+                  stop(true);
+                }
+              }, 20000);
+            } else if (!answerApplied) {
+              log(`No answer yet (status=${cmd.status}, ${attempts})`);
+            }
           } catch (error) {
             log(`Poll/apply answer error: ${error.message}`);
           }

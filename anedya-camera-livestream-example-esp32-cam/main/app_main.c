@@ -59,7 +59,7 @@ void esp_log_compat_include(void);
 #define CAMERA_STREAM_FB_COUNT          CONFIG_CAMERA_FB_COUNT
 #define CAMERA_STREAM_GRAB_MODE         CAMERA_GRAB_LATEST
 
-/* Pin map comes from boards.h, selected via menuconfig Board Selection. */
+/* Pin map comes from boards.h (AI Thinker ESP32-CAM). */
 
 static const char *sensor_pid_name(uint16_t pid)
 {

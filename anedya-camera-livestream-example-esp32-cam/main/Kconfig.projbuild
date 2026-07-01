@@ -5,131 +5,11 @@ menu "Anedya WebRTC Camera"
         help
             UUID of this device from the Anedya console (Settings → Device).
 
-    config ANEDYA_NODE_ID
-        string "Anedya Node ID"
-        default ""
-        help
-            UUID of the node this device belongs to (shown in viewer.html QR).
-
     config ANEDYA_CONNECTION_KEY
         string "Anedya Connection Key"
         default ""
         help
             Device connection key from the Anedya console.
-
-    menu "Board Selection"
-        choice BOARD_TYPE
-            prompt "Development board"
-            default BOARD_ESP32CAM_AITHINKER
-            help
-                Select your ESP32 camera development board. This sets the GPIO
-                pin map used for the camera interface. Choose "Custom" to enter
-                pins manually.
-
-            config BOARD_ESP32CAM_AITHINKER
-                bool "AI Thinker ESP32-CAM"
-            config BOARD_WROVER_KIT
-                bool "ESP-WROVER-KIT"
-            config BOARD_FREENOVE_WROVER
-                bool "Freenove ESP32-Wrover CAM"
-            config BOARD_ESP_EYE
-                bool "ESP-EYE (ESP32)"
-            config BOARD_ESP32S3_EYE
-                bool "ESP32-S3-EYE"
-                depends on IDF_TARGET_ESP32S3
-            config BOARD_XIAO_ESP32S3
-                bool "Seeed XIAO ESP32-S3 Sense"
-                depends on IDF_TARGET_ESP32S3
-            config BOARD_DFROBOT_ESP32S3
-                bool "DFRobot ESP32-S3 AI Camera (DFR1154)"
-                depends on IDF_TARGET_ESP32S3
-            config BOARD_M5STACK_CAMERA_A
-                bool "M5Stack Camera Model A"
-            config BOARD_M5STACK_CAMERA_B
-                bool "M5Stack Camera Model B"
-            config BOARD_TTGO_T_CAMERA
-                bool "TTGO T-Camera (with PIR)"
-            config BOARD_TTGO_T_CAMERA_PLUS
-                bool "TTGO T-Camera Plus"
-            config BOARD_TTGO_T_JOURNAL
-                bool "TTGO T-Journal"
-            config BOARD_CUSTOM
-                bool "Custom (enter pins manually)"
-        endchoice
-
-        menu "Custom Pin Configuration"
-            depends on BOARD_CUSTOM
-
-            config CUSTOM_BOARD_HAS_PSRAM
-                bool "Board has PSRAM"
-                default n
-
-            config CUSTOM_CAM_PIN_PWDN
-                int "PWDN pin (-1 = not used)"
-                default -1
-                range -1 48
-            config CUSTOM_CAM_PIN_RESET
-                int "RESET pin (-1 = not used)"
-                default -1
-                range -1 48
-            config CUSTOM_CAM_PIN_XCLK
-                int "XCLK pin"
-                default 0
-                range 0 48
-            config CUSTOM_CAM_PIN_SIOD
-                int "SIOD (SDA) pin"
-                default 26
-                range 0 48
-            config CUSTOM_CAM_PIN_SIOC
-                int "SIOC (SCL) pin"
-                default 27
-                range 0 48
-            config CUSTOM_CAM_PIN_D7
-                int "D7 pin"
-                default 35
-                range 0 48
-            config CUSTOM_CAM_PIN_D6
-                int "D6 pin"
-                default 34
-                range 0 48
-            config CUSTOM_CAM_PIN_D5
-                int "D5 pin"
-                default 39
-                range 0 48
-            config CUSTOM_CAM_PIN_D4
-                int "D4 pin"
-                default 36
-                range 0 48
-            config CUSTOM_CAM_PIN_D3
-                int "D3 pin"
-                default 21
-                range 0 48
-            config CUSTOM_CAM_PIN_D2
-                int "D2 pin"
-                default 19
-                range 0 48
-            config CUSTOM_CAM_PIN_D1
-                int "D1 pin"
-                default 18
-                range 0 48
-            config CUSTOM_CAM_PIN_D0
-                int "D0 pin"
-                default 5
-                range 0 48
-            config CUSTOM_CAM_PIN_VSYNC
-                int "VSYNC pin"
-                default 25
-                range 0 48
-            config CUSTOM_CAM_PIN_HREF
-                int "HREF pin"
-                default 23
-                range 0 48
-            config CUSTOM_CAM_PIN_PCLK
-                int "PCLK pin"
-                default 22
-                range 0 48
-        endmenu
-    endmenu
 
     menu "Camera Settings"
         choice CAMERA_STREAM_FRAMESIZE
@@ -151,8 +31,6 @@ menu "Anedya WebRTC Camera"
                 bool "VGA (640x480)"
             config CAMERA_FRAMESIZE_SVGA
                 bool "SVGA (800x600)"
-            config CAMERA_FRAMESIZE_HD
-                bool "HD (1280x720)"
         endchoice
 
         config CAMERA_JPEG_QUALITY
@@ -218,12 +96,19 @@ menu "Anedya WebRTC Camera"
         config WEBRTC_AGENT_RECV_TIMEOUT_MS
             int "ICE agent receive timeout (ms)"
             default 100
-            range 20 500
+            range 20 1000
             help
-                How long the ICE agent waits on recv() per loop tick.
-                20ms causes excessive STUN timeout errors on real WiFi.
-                100ms is the peer_demo recommendation. Only affects ICE
-                keepalive responsiveness, not video throughput.
+                Maximum time the ICE agent waits on recv() per loop tick, which
+                also bounds how long it waits before retransmitting a lost
+                STUN/TURN request. STUN relies on FAST retransmission to punch
+                through UDP packet loss, so keep this small: a lost first packet
+                costs one timeout before retry. At 100ms a lost packet retries
+                ~5x within 500ms; at 500ms the same loss stalls gathering for
+                half a second and the relay candidate can miss the answer window.
+                Do NOT raise this to "give TURN more time" — that backfires on
+                lossy paths. 100ms matches the peer_demo recommendation. Raise
+                only if the STUN/TURN server itself is reliably slow (consistent
+                high RTT, not packet loss).
     endmenu
 
     menu "DataChannel Test Mode"

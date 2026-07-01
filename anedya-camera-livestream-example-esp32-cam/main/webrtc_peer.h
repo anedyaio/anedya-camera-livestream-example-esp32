@@ -13,12 +13,9 @@ void webrtc_peer_init(void);
 // Pass NULL for either argument to fall back to STUN-only.
 void webrtc_peer_set_turn_credentials(const char *username, const char *credential);
 
-// Called by Anedya signaling when the browser writes offer_<sessionId>.
+// Called by Anedya signaling when a "webrtc_offer" command arrives.
 // The payload is the raw SDP offer string.
-void webrtc_peer_on_offer(const char *session_id, const char *sdp, size_t sdp_len);
-
-// Called by Anedya signaling when the browser writes a remote ICE candidate.
-void webrtc_peer_on_remote_candidate(const char *candidate, size_t candidate_len);
+void webrtc_peer_on_offer(const char *sdp, size_t sdp_len);
 
 // True after the browser-created "jpeg-test" DataChannel has opened.
 bool webrtc_peer_data_channel_ready(void);

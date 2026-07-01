@@ -46,6 +46,12 @@ CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ=160
 CONFIG_MBEDTLS_SSL_KEEP_PEER_CERTIFICATE=y
 CONFIG_MBEDTLS_SSL_PROTO_DTLS=y
 CONFIG_MBEDTLS_SSL_DTLS_SRTP=y
+# 1ms FreeRTOS tick (matches esp_peer peer_demo). At the default 100Hz/10ms
+# tick, the ICE agent's socket polling and STUN/TURN retransmit timing round to
+# coarse 10ms boundaries, which slows recovery from the brief UDP packet-loss
+# windows seen when gathering TURN relay candidates. 1000Hz makes that timing
+# 10x finer and noticeably more reliable on lossy paths.
+CONFIG_FREERTOS_HZ=1000
 # CONFIG_MBEDTLS_SSL_DTLS_CONNECTION_ID is not set
 # Route mbedTLS allocations to PSRAM, freeing internal RAM for camera DMA.
 CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y

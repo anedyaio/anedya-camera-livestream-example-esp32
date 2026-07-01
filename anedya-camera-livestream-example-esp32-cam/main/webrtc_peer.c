@@ -66,8 +66,6 @@ static esp_peer_handle_t s_peer;
 static QueueHandle_t s_msg_queue;
 static QueueHandle_t s_jpeg_queue;
 
-static char s_session_id[64];
-static int s_candidate_index;
 
 static volatile bool s_start_new_connection;
 static volatile bool s_data_channel_ready;
@@ -108,6 +106,18 @@ static int on_peer_state(esp_peer_state_t state, void *ctx)
     if (is_disconnected_state(state)) {
         s_data_channel_ready = false;
     }
+
+    /*
+     * Conclude the signaling command on a terminal connection outcome so both
+     * Anedya and the browser learn the result. The data channel opening is our
+     * "fully working" signal (success); CONNECT_FAILED is the failure signal.
+     * anedya_sig_command_conclude is a no-op if the command was already concluded.
+     */
+    if (state == ESP_PEER_STATE_DATA_CHANNEL_CONNECTED) {
+        anedya_sig_command_conclude(true, NULL);
+    } else if (state == ESP_PEER_STATE_CONNECT_FAILED) {
+        anedya_sig_command_conclude(false, "webrtc connect failed");
+    }
     return 0;
 }
 
@@ -130,13 +140,13 @@ static int on_peer_msg(esp_peer_msg_t *msg, void *ctx)
     payload[msg->size] = '\0';
 
     if (msg->type == ESP_PEER_MSG_TYPE_SDP) {
-        ESP_LOGI(TAG, "Local SDP answer ready for session=%s (%d bytes)",
-                 s_session_id, msg->size);
-        anedya_sig_write_answer(s_session_id, payload, msg->size);
-    } else if (msg->type == ESP_PEER_MSG_TYPE_CANDIDATE) {
-        ESP_LOGD(TAG, "Local ICE candidate [%d]", s_candidate_index);
-        anedya_sig_write_candidate(s_session_id, s_candidate_index++, payload, msg->size);
+        ESP_LOGI(TAG, "Local SDP answer ready (%d bytes)", msg->size);
+        anedya_sig_write_answer(payload, msg->size);
     }
+    /*
+     * Local ICE candidates are ignored: the answer SDP is sent only after ICE
+     * gathering completes, so it already carries all candidates (non-trickle).
+     */
 
     free(payload);
     return 0;
@@ -266,16 +276,27 @@ static void peer_task(void *arg)
             s_start_new_connection = false;
             s_data_channel_ready = false;
             s_data_stream_id = 0;
-            s_candidate_index = 0;
 
+            /*
+             * Tear down any prior session first. Without this, a previous
+             * CONNECT_FAILED/leftover connection makes esp_peer_update_ice_info
+             * return -3 (invalid state) and the new connection inherits stale
+             * agent state. esp_peer_disconnect is safe to call when idle.
+             */
+            esp_peer_disconnect(s_peer);
+            
             int ice_ret = esp_peer_update_ice_info(s_peer, ESP_PEER_ROLE_CONTROLLED,
                                                     s_ice_servers, s_ice_server_count);
             ESP_LOGI(TAG, "esp_peer_update_ice_info servers=%d ret=%d",
                      s_ice_server_count, ice_ret);
-
-            ESP_LOGI(TAG, "Starting new WebRTC connection (session=%s)", s_session_id);
-            int ret = esp_peer_new_connection(s_peer);
-            ESP_LOGI(TAG, "esp_peer_new_connection ret=%d", ret);
+            if (ice_ret == ESP_PEER_ERR_NONE) {
+                ESP_LOGI(TAG, "Starting new WebRTC connection");
+                int ret = esp_peer_new_connection(s_peer);
+                ESP_LOGI(TAG, "esp_peer_new_connection ret=%d", ret);
+            } else {
+                ESP_LOGE(TAG, "update_ice_info failed (ret=%d); not starting connection",
+                         ice_ret);
+            }
         }
 
         queued_msg_t queued_msg;
@@ -293,7 +314,19 @@ static void peer_task(void *arg)
             free(queued_msg.data);
         }
 
-        send_queued_jpeg();
+        /*
+         * Only touch the JPEG path once the DataChannel is up. During ICE/DTLS
+         * handshake esp_peer_main_loop must run tight and uninterrupted; mixing
+         * frame sends in here starves the agent's STUN/TURN retransmits and is
+         * the classic cause of intermittent PAIRING->CONNECT_FAILED. This mirrors
+         * Espressif's esp_webrtc.c, which only starts its media-send task on
+         * ESP_PEER_STATE_CONNECTED and stops it on DISCONNECTED.
+         */
+        if (s_data_channel_ready) {
+            send_queued_jpeg();
+        } else {
+            drop_pending_jpegs();
+        }
 
         /*
          * esp_peer is cooperative: this call drives ICE, DTLS, SCTP,
@@ -301,8 +334,12 @@ static void peer_task(void *arg)
          */
         esp_peer_main_loop(s_peer);
 
-        // TODO tune delay vs busy loop. esp_peer_main_loop returns immediately if no work is needed, so a small delay prevents pegging the CPU at 100% when idle.
-        vTaskDelay(pdMS_TO_TICKS(1));
+        /*
+         * 10ms matches Espressif's reference pc_task cadence. A 1ms spin wastes
+         * CPU that the agent and lwIP need, and (when unpinned) lets higher-prio
+         * WiFi/camera tasks preempt mid-handshake.
+         */
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
 
@@ -333,8 +370,11 @@ void webrtc_peer_init(void)
      */
     static esp_peer_default_cfg_t default_cfg = {
         /*
-         * 100ms per peer_demo recommendation for real WiFi.
-         * 20ms caused excessive STUN timeout errors (mbedtls WANT_READ spam).
+         * recv() ceiling per loop tick; also bounds STUN/TURN retransmit delay.
+         * Keep small (100ms): STUN punches through UDP loss via fast retransmit,
+         * so a lost packet should cost ~100ms, not 500ms. Raising this slows
+         * loss recovery and pushes the relay candidate past the gathering
+         * window on lossy paths. See CONFIG help for details.
          */
         .agent_recv_timeout = CONFIG_WEBRTC_AGENT_RECV_TIMEOUT_MS,
         .data_ch_cfg = {
@@ -377,7 +417,19 @@ void webrtc_peer_init(void)
     }
 
     ESP_LOGI(TAG, "esp_peer opened, starting main loop task");
-    xTaskCreate(peer_task, "peer_loop", 10 * 1024, NULL, 5, NULL);
+    /*
+     * Pin the peer loop to core 1 at high priority, matching Espressif's
+     * reference esp_webrtc.c scheduler (pc_task: core_id=1, priority=18,
+     * stack=25KB). Core 0 runs the WiFi/lwIP stack; keeping the ICE/DTLS/SCTP
+     * loop off that core and above the camera/MQTT tasks stops the handshake
+     * from being preempted, which is what caused the intermittent
+     * PAIRING->CONNECT_FAILED ("Failed to receive request") failures.
+     */
+    BaseType_t task_ok = xTaskCreatePinnedToCore(
+        peer_task, "peer_loop", 20 * 1024, NULL, 18, NULL, 1);
+    if (task_ok != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create peer_loop task");
+    }
 }
 
 void webrtc_peer_set_turn_credentials(const char *username, const char *credential)
@@ -402,15 +454,12 @@ void webrtc_peer_set_turn_credentials(const char *username, const char *credenti
     ESP_LOGI(TAG, "TURN credentials set, will use relay %s", s_turn_url);
 }
 
-void webrtc_peer_on_offer(const char *session_id, const char *sdp, size_t sdp_len)
+void webrtc_peer_on_offer(const char *sdp, size_t sdp_len)
 {
-    if (!session_id || !sdp || sdp_len == 0) {
+    if (!sdp || sdp_len == 0) {
         ESP_LOGW(TAG, "Ignoring empty offer");
         return;
     }
-
-    strncpy(s_session_id, session_id, sizeof(s_session_id) - 1);
-    s_session_id[sizeof(s_session_id) - 1] = '\0';
 
     uint8_t *copy = malloc(sdp_len + 1);
     if (!copy) {
@@ -434,33 +483,7 @@ void webrtc_peer_on_offer(const char *session_id, const char *sdp, size_t sdp_le
         return;
     }
 
-    ESP_LOGI(TAG, "Remote offer queued session=%s len=%d", s_session_id, (int)sdp_len);
-}
-
-void webrtc_peer_on_remote_candidate(const char *candidate, size_t candidate_len)
-{
-    if (!candidate || candidate_len == 0) {
-        return;
-    }
-
-    uint8_t *copy = malloc(candidate_len + 1);
-    if (!copy) {
-        ESP_LOGE(TAG, "OOM queueing ICE candidate");
-        return;
-    }
-    memcpy(copy, candidate, candidate_len);
-    copy[candidate_len] = '\0';
-
-    queued_msg_t msg = {
-        .type = ESP_PEER_MSG_TYPE_CANDIDATE,
-        .data = copy,
-        .size = (int)candidate_len,
-    };
-
-    if (xQueueSend(s_msg_queue, &msg, pdMS_TO_TICKS(1000)) != pdTRUE) {
-        ESP_LOGE(TAG, "Candidate queue full, dropping");
-        free(copy);
-    }
+    ESP_LOGI(TAG, "Remote offer queued len=%d", (int)sdp_len);
 }
 
 bool webrtc_peer_data_channel_ready(void)

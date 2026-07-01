@@ -3,7 +3,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
-project(anedya-camera-livestream-example-esp-cam)
+project(anedya-camera-livestream-example-esp32-cam)
 
 # sepfy__srtp 2.3.0 has uint32_t vs unsigned int* mismatch, exposed by GCC 14
 idf_build_set_property(COMPILE_OPTIONS "-Wno-error=incompatible-pointer-types" APPEND)

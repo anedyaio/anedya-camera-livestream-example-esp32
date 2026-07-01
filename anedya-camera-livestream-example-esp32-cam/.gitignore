@@ -31,3 +31,6 @@ Thumbs.db
 *.pem
 *.key
 secrets.h
+.devcontainer/
+.vscode/
+.env

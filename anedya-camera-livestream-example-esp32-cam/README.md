@@ -5,16 +5,16 @@
     <img src="https://cdn.anedya.io/anedya_black_banner.png" alt="Logo">
 </p>
 
-# Anedya Camera Example ESP32 
+# ESP32-CAM - WebRTC Camera Livestream with Anedya
 
 ![Camera View](./media/camera_view.png)
 
-Turn an ESP32-CAM into a real-time camera livestream device using Anedya for signaling and TURN relay provisioning, and WebRTC DataChannel for low-latency video delivery.
+Turn an AI Thinker ESP32-CAM into a real-time camera livestream device using Anedya for signaling and TURN relay provisioning, and WebRTC DataChannel for low-latency video delivery.
 
 ## ✨ Features
 
 - **Live JPEG streaming :** Camera frames sent over WebRTC DataChannel.
-- **Anedya ValueStore signaling :** SDP offer/answer and ICE candidates exchanged via MQTT, no custom signaling server needed
+- **Anedya Commands signaling :** SDP offer/answer and ICE candidates exchanged via MQTT, no custom signaling server needed
 - **Configurable stream profile :** frame size, JPEG quality, FPS, and frame buffer count tunable 
 - **DataChannel test mode :** verify WebRTC signaling and connectivity without a camera attached
 - **Zero-copy frame path :** camera frame buffer ownership is transferred through the send pipeline and released only after transmission
@@ -23,24 +23,24 @@ Turn an ESP32-CAM into a real-time camera livestream device using Anedya for sig
 
 ## 🏗 How It Works
 
-### Signaling via Anedya ValueStore + MQTT
+### Signaling via Anedya Commands + MQTT
 
-WebRTC requires both peers to exchange SDP offers and answers before media can flow. This example uses Anedya ValueStore as a signaling channel and Anedya MQTT as the notification mechanism.
+WebRTC requires both peers to exchange SDP offers and answers before media can flow. This example uses Anedya Commands as a signaling channel and Anedya MQTT as the notification mechanism.
 
 ```
 Browser Viewer
   │  1. Fetch TURN credentials (Anedya REST API)
-  │  2. Create WebRTC offer + write offer_<sessionId> to ValueStore (JSON with SDP + TURN creds)
+  │  2. Create WebRTC offer to Commands (JSON with SDP + TURN creds)
   ▼
-Anedya Cloud  (ValueStore + MQTT broker + TURN relay)
+Anedya Cloud  (Commands + MQTT broker + TURN relay)
   │  3. Notify ESP32 over MQTT subscription
   ▼
 ESP32-CAM
   │  4. Parse offer, extract SDP + TURN credentials
-  │  5. Create WebRTC answer + write answer_<sessionId> to ValueStore
+  │  5. Create WebRTC answer ackowledgement to Commands
   ▼
 Browser Viewer
-  │  6. Poll ValueStore → read answer → apply remote description
+  │  6. Poll Commands status → read answer ackowledgement → apply remote description
   │  7. ICE negotiation completes
   │  8. JPEG frames flow over WebRTC DataChannel → rendered in <img>
 ```
@@ -98,7 +98,7 @@ This project does not use WebRTC RTP video tracks. Instead, camera JPEG frames a
 
 ### Step 1: Create Your Anedya Project
 
-1. Sign in at [Anedya Console](https://console.anedya.io).
+1. Sign in at [Anedya Console](https://accounts.anedya.io/ui/login).
 2. Create a new project.
 3. Create a node for your ESP32-CAM and pre-authorize it with a UUID.
 4. Note down these values, you will need them in Step 3:
@@ -106,7 +106,7 @@ This project does not use WebRTC RTP video tracks. Instead, camera JPEG frames a
 | Value | Where to find it |
 |---|---|
 | `ANEDYA_DEVICE_ID` | Node details → Device ID |
-| `ANEDYA_NODE_ID` | Node details → Node ID (shown in viewer QR) |
+| `ANEDYA_NODE_ID` | Node details → Node ID |
 | `ANEDYA_CONNECTION_KEY` | Node details → Connection Key |
 
 5. Generate a **Platform API key** for the browser viewer.
@@ -119,8 +119,9 @@ This project does not use WebRTC RTP video tracks. Instead, camera JPEG frames a
 ### Step 2: Clone the Repository
 
 ```bash
-git clone https://github.com/anedyaio/anedya-camera-livestream-example-esp-cam.git
-cd anedya-camera-livestream-example-esp-cam
+git clone https://github.com/anedyaio/anedya-camera-livestream-example-esp32
+cd anedya-camera-livestream-example-esp32
+cd anedya-livestream-example-esp32-cam
 ```
 
 ---
@@ -136,7 +137,6 @@ idf.py menuconfig
 | Config key | Where to find it |
 |---|---|
 | `ANEDYA_DEVICE_ID` | Anedya console → Device → Settings |
-| `ANEDYA_NODE_ID` | Shown in viewer QR code |
 | `ANEDYA_CONNECTION_KEY` | Anedya console → Device → Connection Key |
 
 Also configure WiFi credentials under **Example Connection Configuration**.
@@ -179,8 +179,6 @@ The default profile targets balanced quality at 20 FPS:
 | Frame size | HVGA (480 × 320) |
 | JPEG quality | 23 |
 | Frame buffer count | 2 |
-| Grab mode | `CAMERA_GRAB_LATEST` |
-| XCLK | 20 MHz |
 | Target FPS | 20 |
 
 A max-FPS / lower-quality preset is documented in comments in [main/app_main.c](main/app_main.c):
@@ -227,7 +225,7 @@ Enable `CONFIG_DATACHANNEL_TEST_MODE` in menuconfig to skip camera init entirely
 | JPEG | Hardware encoder onboard |
 | XCLK | 20 MHz |
 
-### Pin Map
+### Pin Map (ESP32 Cam)
 
 | Signal | GPIO |
 |---|---|
@@ -245,7 +243,7 @@ Enable `CONFIG_DATACHANNEL_TEST_MODE` in menuconfig to skip camera init entirely
 
 | Board | Link |
 |---|---|
-| ESP32-CAM | [Official product page](https://vdoc.ai-thinker.com/en/esp32-cam) · [Amazon](https://www.amazon.com/esp32-cam-ai-thinker/s?k=esp32+cam+ai+thinker) · [DigiKey](https://www.digikey.com/en/products/detail/universal-solder-electronics-ltd/Ai-Thinker-ESP32-CAM-WiFi-BT-BLE/14319899) |
+| AI Thinker ESP32-CAM | [Official product page](https://vdoc.ai-thinker.com/en/esp32-cam) · [Amazon](https://www.amazon.com/esp32-cam-ai-thinker/s?k=esp32+cam+ai+thinker) · [DigiKey](https://www.digikey.com/en/products/detail/universal-solder-electronics-ltd/Ai-Thinker-ESP32-CAM-WiFi-BT-BLE/14319899) |
 | DFRobot ESP32-S3 AI Camera (DFR1154) | [DFRobot store](https://www.dfrobot.com/product-2899.html) · [Wiki / docs](https://wiki.dfrobot.com/SKU_DFR1154_ESP32_S3_AI_CAM) |
 
 ---
@@ -257,8 +255,9 @@ Enable `CONFIG_DATACHANNEL_TEST_MODE` in menuconfig to skip camera init entirely
 - [Anedya Concepts](https://docs.anedya.io/essentials/concepts/)
 - [Anedya Project Setup](https://docs.anedya.io/getting-started/project-setup/)
 - [Anedya MQTT Endpoints](https://docs.anedya.io/device/mqtt-endpoints/)
-- [Anedya ValueStore](https://docs.anedya.io/features/valuestore/valuestore-intro/)
+- [Anedya Commands](https://docs.anedya.io/features/commands/commands-intro/)
 - [Anedya Platform API](https://docs.anedya.io/platform-api/)
+- [Anedya ESP-IDF SDK](https://components.espressif.com/components/anedya/anedya-esp/versions/0.0.15/readme)
 
 **WebRTC & ESP-IDF**
 - [WebRTC Overview](https://webrtc.org/getting-started/overview)
@@ -267,8 +266,13 @@ Enable `CONFIG_DATACHANNEL_TEST_MODE` in menuconfig to skip camera init entirely
 - [espressif/esp32-camera](https://components.espressif.com/components/espressif/esp32-camera)
 - [ESP-IDF Getting Started](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/)
 
+**Looking for other examples**
+
+- [Anedya Camera Livestream with Raspberry Pi](https://github.com/anedyaio/anedya-camera-livestream-example)
+
 ---
+
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the [Apache License 2.0](LICENSE).
