@@ -63,7 +63,7 @@ This project does not use WebRTC RTP video tracks. Instead, camera JPEG frames a
 
 ---
 
-### Anedya Board Support
+### Anedya - Camera Board Support
 
 | Board | Support Status |
 |---|---|
