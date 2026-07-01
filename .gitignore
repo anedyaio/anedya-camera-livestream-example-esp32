@@ -1,0 +1,36 @@
+# ESP-IDF build output
+build/
+
+# IDF component manager
+managed_components/
+dependencies.lock
+
+# Old srtp component (replaced by managed)
+components/srtp
+
+# sdkconfig.old only — keep sdkconfig tracked (has PSRAM/flash settings)
+sdkconfig.old
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE
+.vscode/settings.json
+.vscode/c_cpp_properties.json
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets — never commit these
+*.pem
+*.key
+secrets.h
+.devcontainer/
+.vscode/
+.env
