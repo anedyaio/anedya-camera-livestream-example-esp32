@@ -74,16 +74,6 @@ This project does not use WebRTC RTP video tracks. Instead, camera JPEG frames a
 
 ---
 
-
-### Where to Buy
-
-| Board | Link |
-|---|---|
-| ESP32-CAM | [Official product page](https://vdoc.ai-thinker.com/en/esp32-cam) · [Amazon](https://www.amazon.com/esp32-cam-ai-thinker/s?k=esp32+cam+ai+thinker) · [DigiKey](https://www.digikey.com/en/products/detail/universal-solder-electronics-ltd/Ai-Thinker-ESP32-CAM-WiFi-BT-BLE/14319899) |
-| DFRobot ESP32-S3 AI Camera (DFR1154) | [DFRobot store](https://www.dfrobot.com/product-2899.html) · [Wiki / docs](https://wiki.dfrobot.com/SKU_DFR1154_ESP32_S3_AI_CAM) |
-
----
-
 ## 📚 References
 
 **Looking for other examples**
