@@ -20,6 +20,15 @@ Turn an ESP32-Camera board into a real-time camera livestream device with Anedya
 
 ---
 
+### Anedya - Camera Board Support
+
+| Board | Support Status | Link |
+|---|---|--|
+| ESP32-CAM | Supported | [Link](./anedya-camera-livestream-example-esp32-cam/)|
+<!-- | DFRobot ESP32-S3 AI Camera | Supported | -->
+
+---
+
 ## 🏗 How It Works
 
 ### Signaling via Anedya Commands + MQTT
@@ -64,15 +73,6 @@ This project does not use WebRTC RTP video tracks. Instead, camera JPEG frames a
 
 ---
 
-### Anedya - Camera Board Support
-
-| Board | Support Status |
-|---|---|
-| ESP32-CAM | Supported | [Link](./anedya-camera-livestream-example-esp32-cam/)
-<!-- | DFRobot ESP32-S3 AI Camera | Supported | -->
-
-
----
 
 ### Where to Buy
 
