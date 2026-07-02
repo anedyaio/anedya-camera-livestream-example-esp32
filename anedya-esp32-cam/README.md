@@ -160,7 +160,7 @@ idf.py -p /dev/ttyUSB0 flash monitor
 
 ### Step 5: Connect a Viewer
 
-Open the browser viewer (included in the companion viewer repository or hosted version), then:
+Open the browser viewer (included in the companion viewer repository or [hosted version](https://anedyaio.github.io/anedya-camera-livestream-example-esp32/)), then:
 
 1. Click **Settings**
 2. Enter your **Node ID** and **Platform API key**
