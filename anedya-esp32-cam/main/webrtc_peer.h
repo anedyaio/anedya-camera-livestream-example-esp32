@@ -24,14 +24,10 @@ bool webrtc_peer_data_channel_ready(void);
 // Returns false if the channel is not ready or the send fails.
 bool webrtc_peer_send_text(const char *text, int len);
 
-// Queue one JPEG frame for transmission.
-// This copies the frame and drops any older unsent frame to keep latency low.
-bool webrtc_peer_send_jpeg(const uint8_t *data, size_t len);
-
-typedef void (*webrtc_peer_jpeg_release_cb_t)(void *ctx);
+typedef void (*webrtc_peer_jpeg_release_callback_t)(void *context);
 
 // Queue one JPEG frame without copying it.
-// The caller transfers temporary ownership until release_cb(ctx) is called.
-bool webrtc_peer_send_jpeg_ref(const uint8_t *data, size_t len,
-                               webrtc_peer_jpeg_release_cb_t release_cb,
-                               void *ctx);
+// The caller transfers temporary ownership until release_callback(context) is called.
+bool webrtc_peer_send_jpeg_by_reference(const uint8_t *data, size_t len,
+                                        webrtc_peer_jpeg_release_callback_t release_callback,
+                                        void *context);

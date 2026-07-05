@@ -11,6 +11,8 @@ void __attribute__((weak)) esp_log(esp_log_level_t level, const char *tag, const
     va_end(args);
 }
 
+// Empty on purpose. app_main() calls this so the linker keeps this translation
+// unit (and therefore the weak esp_log stub above) in the final binary.
 void esp_log_compat_include(void)
 {
 }
