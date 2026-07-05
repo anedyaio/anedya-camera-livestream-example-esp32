@@ -71,9 +71,10 @@ This project does not use WebRTC RTP video tracks. Instead, camera JPEG frames a
 .
 ├── main/
 │   ├── app_main.c          — camera init, JPEG stream task, FreeRTOS entry
-│   ├── anedya_sig.c        — Anedya MQTT client, ValueStore signaling read/write
+│   ├── anedya_sig.c        — Anedya MQTT client, Commands-based signaling
 │   ├── webrtc_peer.c       — esp_peer WebRTC peer, DataChannel send pipeline
-│   ├── Kconfig.projbuild   — menuconfig: Device ID, Connection Key, test mode
+│   ├── boards.h            — ESP32-CAM camera pin map
+│   ├── Kconfig.projbuild   — menuconfig: Device ID, Connection Key, camera, test mode
 │   └── idf_component.yml   — IDF component dependencies
 ├── components/
 │   └── anedya__anedya-esp/ — Anedya ESP-IDF SDK
@@ -177,7 +178,7 @@ The default profile targets balanced quality at 20 FPS:
 | Setting | Value |
 |---|---|
 | Frame size | HVGA (480 × 320) |
-| JPEG quality | 23 |
+| JPEG quality | 25 |
 | Frame buffer count | 2 |
 | Target FPS | 20 |
 
@@ -244,7 +245,6 @@ Enable `CONFIG_DATACHANNEL_TEST_MODE` in menuconfig to skip camera init entirely
 | Board | Link |
 |---|---|
 | AI Thinker ESP32-CAM | [Official product page](https://vdoc.ai-thinker.com/en/esp32-cam) · [Amazon](https://www.amazon.com/esp32-cam-ai-thinker/s?k=esp32+cam+ai+thinker) · [DigiKey](https://www.digikey.com/en/products/detail/universal-solder-electronics-ltd/Ai-Thinker-ESP32-CAM-WiFi-BT-BLE/14319899) |
-| DFRobot ESP32-S3 AI Camera (DFR1154) | [DFRobot store](https://www.dfrobot.com/product-2899.html) · [Wiki / docs](https://wiki.dfrobot.com/SKU_DFR1154_ESP32_S3_AI_CAM) |
 
 ---
 
