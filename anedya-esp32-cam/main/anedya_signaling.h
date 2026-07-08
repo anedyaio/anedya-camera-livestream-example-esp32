@@ -3,7 +3,9 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-// Start Anedya MQTT signaling. Must be called after WiFi is connected.
+// Start Anedya MQTT signaling. Must be called after WiFi is connected. Also
+// starts a background task that periodically heartbeats Anedya so the cloud
+// tracks the device as online.
 void anedya_signaling_init(void);
 
 // Publish the local SDP answer as the ack data of the in-flight "webrtc_offer"

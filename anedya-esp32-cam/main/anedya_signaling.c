@@ -58,6 +58,10 @@ static const char *TAG = "anedya_signaling";
 #define SIGNALING_TX_TASK_STACK_BYTES 6144 // stack for the transmit task
 #define SIGNALING_TX_TASK_PRIORITY 4       // FreeRTOS priority for the transmit task
 
+#define HEARTBEAT_PERIOD_MS 30000          // how often to heartbeat Anedya (online status)
+#define HEARTBEAT_TASK_STACK_BYTES 6144    // stack for the heartbeat task (TLS/JSON publish)
+#define HEARTBEAT_TASK_PRIORITY 3          // FreeRTOS priority for the heartbeat task
+
 #define STATUS_UPDATE_TIMEOUT_MS 10000     // wait for one status update to complete
 #define MQTT_CONNECT_TIMEOUT_MS 30000      // wait for the MQTT connection at startup
 #define ANEDYA_REQUEST_TIMEOUT_MS 30000    // per-request timeout configured on the SDK client
@@ -106,6 +110,63 @@ static void transaction_notify_task(anedya_txn_t *transaction, anedya_context_t 
 {
     TaskHandle_t *task = (TaskHandle_t *)context;
     xTaskNotify(*task, 0x01, eSetValueWithOverwrite);
+}
+
+// Send a heartbeat to Anedya so the cloud knows the device is online, and block
+// until it completes (or times out). Anedya marks a device offline if it stops
+// receiving heartbeats. Returns true on success. Skips the attempt (returns
+// false) if MQTT is not connected. Runs on the heartbeat task, which has enough
+// stack for the TLS/JSON publish path (app_main's stack does not).
+static bool send_heartbeat(void)
+{
+    if (!s_connection_events ||
+        (xEventGroupGetBits(s_connection_events) & MQTT_CONNECTED_BIT) == 0) {
+        ESP_LOGW(TAG, "Skipping heartbeat: MQTT not connected");
+        return false;
+    }
+
+    TaskHandle_t caller = xTaskGetCurrentTaskHandle();
+    anedya_txn_t transaction = {0};
+    uint32_t notification = 0;
+
+    anedya_txn_register_callback(&transaction, transaction_notify_task, &caller);
+    anedya_err_t error = anedya_device_send_heartbeat(&s_client, &transaction);
+    if (error != ANEDYA_OK) {
+        ESP_LOGE(TAG, "Heartbeat submit failed: %s", anedya_err_to_name(error));
+        return false;
+    }
+
+    xTaskNotifyWait(0x00, ULONG_MAX, &notification, pdMS_TO_TICKS(STATUS_UPDATE_TIMEOUT_MS));
+    if (notification == 0x01 && transaction.is_success) {
+        ESP_LOGI(TAG, "Heartbeat sent to Anedya");
+        return true;
+    }
+
+    ESP_LOGE(TAG, "Heartbeat failed/timeout notification=0x%lx complete=%d success=%d op_err=%d",
+             (unsigned long)notification, transaction.is_complete, transaction.is_success,
+             transaction._op_err);
+
+    // Release the SDK transaction slot if it never completed (see
+    // command_status_blocking for the rationale — slots are a limited resource).
+    if (!transaction.is_complete && transaction.desc > 0) {
+        transaction.callback = NULL;
+        transaction.ctx = NULL;
+        _anedya_txn_store_release_slot(&s_client.txn_store, &transaction);
+    }
+    return false;
+}
+
+// Heartbeat task. Waits until MQTT is connected, then heartbeats Anedya once per
+// HEARTBEAT_PERIOD_MS forever. Runs on its own task so the blocking publish (TLS,
+// JSON, base64) has adequate stack — the app_main task does not.
+static void heartbeat_task(void *argument)
+{
+    for (;;) {
+        xEventGroupWaitBits(
+            s_connection_events, MQTT_CONNECTED_BIT, pdFALSE, pdFALSE, portMAX_DELAY);
+        send_heartbeat();
+        vTaskDelay(pdMS_TO_TICKS(HEARTBEAT_PERIOD_MS));
+    }
 }
 
 // Publish a status update for command_id and block until it completes (or times
@@ -470,6 +531,12 @@ void anedya_signaling_init(void)
     }
 
     ESP_LOGI(TAG, "Anedya signaling ready");
+
+    // Start the heartbeat task so Anedya tracks this device as online.
+    if (xTaskCreate(heartbeat_task, "anedya_hb", HEARTBEAT_TASK_STACK_BYTES, NULL,
+                    HEARTBEAT_TASK_PRIORITY, NULL) != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create heartbeat task (out of memory?)");
+    }
 }
 
 // Publish the local SDP answer. Called by the WebRTC layer once esp_peer has

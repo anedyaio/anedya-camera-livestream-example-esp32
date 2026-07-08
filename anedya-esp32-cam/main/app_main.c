@@ -15,6 +15,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include "esp_psram.h"
+#include "esp_system.h"
 
 #include "anedya_signaling.h"
 #include "esp_camera.h"
@@ -414,8 +416,38 @@ void app_main(void)
     webrtc_peer_init();
 
     // Heap heartbeat. app_main must not return, so we idle here.
-    for (;;) {
-        ESP_LOGI(TAG, "Main loop: free memory: %lu bytes", esp_get_free_heap_size());
-        vTaskDelay(pdMS_TO_TICKS(HEAP_HEARTBEAT_PERIOD_MS));
+  while (1) {
+      size_t free_internal = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+      size_t free_psram = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+      size_t largest_free_block_internal =
+          heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
+      size_t largest_free_block_psram =
+          heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM);
+      size_t min_free_heap = esp_get_minimum_free_heap_size();
+      size_t total_free_heap = esp_get_free_heap_size();
+      size_t psram_size = 0;
+      if (esp_psram_is_initialized())
+        psram_size = esp_psram_get_size();
+
+      ESP_LOGI(TAG,
+               "\n\t======= Memory Status ====\n"
+               "\tFree internal RAM            : %u bytes (%.2f KB)\n"
+               "\tFree PSRAM                   : %u bytes (%.2f KB)\n"
+               "\tTotal PSRAM Size             : %u bytes (%.2f KB)\n"
+               "\tTotal Free Heap              : %u bytes (%.2f KB)\n"
+               "\tMin Free Heap                : %u bytes (%.2f KB)\n"
+               "\tLargest free block (internal): %u bytes (%.2f KB)\n"
+               "\tLargest free block (PSRAM)   : %u bytes (%.2f KB)\n"
+               "\t===========================",
+               (unsigned)free_internal, free_internal / 1024.0,
+               (unsigned)free_psram, free_psram / 1024.0, (unsigned)psram_size,
+               psram_size / 1024.0, (unsigned)total_free_heap,
+               total_free_heap / 1024.0, (unsigned)min_free_heap,
+               min_free_heap / 1024.0, (unsigned)largest_free_block_internal,
+               largest_free_block_internal / 1024.0,
+               (unsigned)largest_free_block_psram,
+               largest_free_block_psram / 1024.0);
+
+      vTaskDelay(pdMS_TO_TICKS(30000)); // Print every 5 seconds
     }
 }

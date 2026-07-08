@@ -378,6 +378,38 @@
     }
 
 
+    // Ask Anedya whether the node has heartbeated recently. Throws if the device
+    // is offline (or the status can't be determined), so the caller can abort
+    // before spending time on the WebRTC handshake against a dead device.
+    // Device heartbeats every 30 s (see anedya_signaling.c). 90 s tolerates one
+    // or two missed beats before we call it offline.
+    async function checkNodeOnline(thresholdSeconds = 90) {
+      const node = namespaceId();
+      const resp = await fetch(`${API_BASE}/health/status`, {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({ nodes: [node], lastContactThreshold: thresholdSeconds }),
+      });
+      if (!resp.ok) {
+        throw new Error(`Health check failed: ${resp.status} ${await resp.text()}`);
+      }
+      const json = await resp.json();
+      if (json.success === false) {
+        throw new Error(`Health check error: ${json.error || json.reasonCode || "unknown"}`);
+      }
+      const info = json.data?.[node];
+      if (!info) {
+        throw new Error("Health check returned no data for this node");
+      }
+      if (!info.online) {
+        const last = info.lastHeartbeat
+          ? new Date(info.lastHeartbeat * 1000).toLocaleString()
+          : "never";
+        throw new Error(`Device is OFFLINE (last heartbeat: ${last})`);
+      }
+      log(`Device is online (last heartbeat: ${new Date(info.lastHeartbeat * 1000).toLocaleTimeString()})`);
+    }
+
     async function fetchTurnCredentials() {
       const resp = await fetch(`${API_BASE}/relay/create`, {
         method: 'POST',
@@ -557,9 +589,15 @@
     startBtn.addEventListener("click", async () => {
       try {
         logEl.textContent = "";
-        setStatus("Creating offer...");
         startBtn.disabled = true;
         stopBtn.disabled = false;
+
+        // Bail out early if the ESP isn't online — no point handshaking a device
+        // that hasn't heartbeated. checkNodeOnline throws when offline.
+        setStatus("Checking device status...");
+        await checkNodeOnline();
+
+        setStatus("Creating offer...");
 
         const iceServers = [{ urls: "stun:turn1.ap-in-1.anedya.io:3478" }];
         let turnCreds = null;

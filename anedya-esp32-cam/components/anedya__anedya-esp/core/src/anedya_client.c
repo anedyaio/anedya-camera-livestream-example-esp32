@@ -6,6 +6,7 @@
 #include "string.h"
 #include "sys/time.h" // TODO: Remove time header dependency
 #include <stdio.h>
+#include <time.h>
 
 anedya_err_t anedya_client_init(anedya_config_t *config,
                                 anedya_client_t *client) {
