@@ -456,7 +456,7 @@ void webrtc_peer_init(void)
         .video_dir = ESP_PEER_MEDIA_DIR_NONE,
         .enable_data_channel = true,
         .manual_ch_create = true,
-        .no_auto_reconnect = true, // TODO
+        .no_auto_reconnect = false, // TODO
         .extra_cfg = &default_cfg,
         .extra_size = sizeof(default_cfg),
         .on_state = on_peer_state,
