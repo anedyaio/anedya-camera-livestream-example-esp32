@@ -1,13 +1,13 @@
 menu "Anedya WebRTC Camera"
     config ANEDYA_DEVICE_ID
         string "Anedya Device ID"
-        default ""
+        default "<YOUR_DEVICE_ID>"
         help
             UUID of this device from the Anedya console (Settings → Device).
 
     config ANEDYA_CONNECTION_KEY
         string "Anedya Connection Key"
-        default ""
+        default "<YOUR_CONNECTION_KEY>"
         help
             Device connection key from the Anedya console.
 

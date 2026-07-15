@@ -36,3 +36,5 @@ secrets.h
 .env
 docs/
 .cache/
+sdkconfig
+.clangd

@@ -145,9 +145,10 @@ idf.py menuconfig
 ```
 
 | Config key | Where to find it | Value | 
-|---|---|
-| `ANEDYA_DEVICE_ID` | Anedya console → Device → Settings |
-| `ANEDYA_CONNECTION_KEY` | Anedya console → Device → Connection Key |
+|---|---|--|
+| `ANEDYA_DEVICE_ID` | Anedya console → Device → Settings | <YOUR_DEVICE_ID> |
+| `ANEDYA_CONNECTION_KEY` | Anedya console → Device → Connection Key | <YOUR_CONNECTION_KEY> |
+| `Camera board` | Camera Settings -> Camera Board  | Board you are using |
 | `Support DTLS protocol (all versions)` | Component config -> mbedtls | Enable |
 | `CONFIG_MBEDTLS_SSL_DTLS_SRTP` | Component config->mbedTLS->mbedTLS v3.x related->DTLS-based configurations  | Enable |
 | `PARTITION_TABLE_TYPE` | Partition Table -> Partition Table  | Custome Partition table csv |
