@@ -34,3 +34,5 @@ secrets.h
 .devcontainer/
 .vscode/
 .env
+docs/
+.cache/

@@ -1,0 +1,187 @@
+menu "Anedya WebRTC Camera"
+    config ANEDYA_DEVICE_ID
+        string "Anedya Device ID"
+        default ""
+        help
+            UUID of this device from the Anedya console (Settings → Device).
+
+    config ANEDYA_CONNECTION_KEY
+        string "Anedya Connection Key"
+        default ""
+        help
+            Device connection key from the Anedya console.
+
+    menu "Camera Settings"
+        choice CAMERA_BOARD
+            prompt "Camera board"
+            default CAMERA_BOARD_XIAO_ESP32S3 if IDF_TARGET_ESP32S3
+            default CAMERA_BOARD_AI_THINKER
+            help
+                Selects the camera pin map for your board. The default follows
+                the build target, so normally you only need:
+                  idf.py set-target esp32s3   -> Seeed XIAO ESP32S3 Sense
+                  idf.py set-target esp32     -> AI Thinker ESP32-CAM
+                The per-target sdkconfig.defaults.* files carry the matching
+                flash size and PSRAM mode.
+
+            config CAMERA_BOARD_AI_THINKER
+                bool "AI Thinker ESP32-CAM (ESP32)"
+            config CAMERA_BOARD_XIAO_ESP32S3
+                bool "Seeed XIAO ESP32S3 Sense (ESP32-S3)"
+            config CAMERA_BOARD_DFROBOT_ESP32S3
+                bool "DFrobot ESP32S3 AI Camera (ESP32-S3)"
+        endchoice
+
+        choice CAMERA_STREAM_FRAMESIZE
+            prompt "Frame size"
+            default CAMERA_FRAMESIZE_HVGA
+            help
+                Sensor output resolution. HVGA (480x320) is the fastest on OV3660
+                at 32.6 FPS. Larger sizes reduce sensor FPS and increase frame bytes.
+
+            config CAMERA_FRAMESIZE_96X96
+                bool "96x96"
+            config CAMERA_FRAMESIZE_QQVGA
+                bool "QQVGA (160x120)"
+            config CAMERA_FRAMESIZE_QVGA
+                bool "QVGA (320x240)"
+            config CAMERA_FRAMESIZE_HVGA
+                bool "HVGA (480x320) — fastest on OV3660"
+            config CAMERA_FRAMESIZE_VGA
+                bool "VGA (640x480)"
+            config CAMERA_FRAMESIZE_SVGA
+                bool "SVGA (800x600)"
+            config CAMERA_FRAMESIZE_HD
+                bool "HD (1280x720)"
+                depends on CAMERA_BOARD_DFROBOT_ESP32S3 || CAMERA_BOARD_XIAO_ESP32S3
+        endchoice
+
+        config CAMERA_JPEG_QUALITY
+            int "JPEG quality (0=best/largest, 63=worst/smallest)"
+            default 25
+            range 0 63
+            help
+                OV3660 hardware JPEG encoder quantization setting.
+                Lower = better image quality but larger frame bytes = lower FPS.
+                Higher = blockier image but smaller frames = higher FPS.
+                Typical values: 10 (~6KB), 25 (~3-4KB), 40 (~2KB).
+
+        config CAMERA_FB_COUNT
+            int "Frame buffer count"
+            default 2
+            range 1 4
+            help
+                Number of PSRAM frame buffers. With 2+, I2S DMA runs continuously
+                (double speed mode). 1 = stop/start DMA per frame (lower throughput).
+                2 is the recommended minimum for live streaming.
+
+        config CAMERA_STREAM_FPS
+            int "Target stream FPS"
+            default 20
+            range 1 30
+            help
+                Software rate limiter for the JPEG stream task. Sets how often
+                a frame is captured and queued for DataChannel transmission.
+                The actual delivered FPS at the browser is limited by DataChannel
+                bandwidth: ~600 kbps / frame_bytes_per_second.
+    endmenu
+
+    menu "WebRTC DataChannel Tuning"
+        config WEBRTC_SEND_CACHE_SIZE
+            int "SCTP send cache size (bytes)"
+            default 65536
+            range 2048 131072
+            help
+                SCTP send buffer — how many bytes of outgoing data SCTP holds
+                while waiting for the peer receive window and congestion window.
+                Must be >= 1 max frame size or every send hits WOULD_BLOCK.
+
+                On a DIRECT (low-RTT) path 8KB is plenty. But on the Anedya TURN
+                RELAY, RTT is 200-1700ms, so many frames are in-flight-unacked at
+                once; an 8KB cache fills, the SCTP send path jams, and that
+                back-pressure starves the ICE agent's STUN consent Bindings
+                (observed as "Failed to send STUN Binding Request" on the ESP and
+                a ~90s relay teardown). Espressif's esp_peer README data-channel
+                profile uses 102400 (100KB). 64KB is a memory-conscious match
+                (~13 max frames of headroom) that keeps relay stable. Do NOT drop
+                back to 8KB unless you never use TURN relay. See the peer_demo's
+                1536B value — that is for tiny CONTROL messages, not bulk JPEG.
+
+        config WEBRTC_RECV_CACHE_SIZE
+            int "SCTP receive cache size (bytes)"
+            default 8192
+            range 512 16384
+            help
+                SCTP receive buffer advertised to the browser as a_rwnd. The ESP
+                only receives small control strings from the browser, so this can
+                stay modest; 8192 gives margin over the old 2048 at negligible
+                cost. (Espressif's README profile uses 100KB, but that is sized
+                for a peer that also receives bulk data — we don't.)
+
+        config WEBRTC_CACHE_TIMEOUT_MS
+            int "DataChannel frame discard timeout (ms)"
+            default 200
+            range 10 5000
+            help
+                How long esp_peer keeps a frame in the send cache before
+                discarding it as stale.
+
+                50ms (~one frame period at 20 FPS) is right for a direct path,
+                but on the TURN relay a frame legitimately takes 200-500ms to
+                drain, so 50ms discards frames that were still perfectly
+                deliverable, worsening the relay stall. 200ms (~4 frames of slack)
+                tolerates relay RTT without hoarding stale frames. The original
+                2000ms let frames pile into seconds of latency — too far the other
+                way. Espressif's README default is 5000ms.
+
+        config WEBRTC_AGENT_RECV_TIMEOUT_MS
+            int "ICE agent receive timeout (ms)"
+            default 500
+            range 20 1000
+            help
+                Maximum time the ICE agent waits on recv() per loop tick, which
+                also bounds how long it waits before retransmitting a lost
+                STUN/TURN request.
+
+                For a purely direct (STUN/host) path 100ms is ideal: STUN relies
+                on FAST retransmission to punch through UDP loss, and a small
+                timeout means a lost first packet costs only ~100ms before retry.
+
+                BUT when traffic goes through the Anedya TURN relay, measured RTT
+                is 200-1100ms (relay hop + distance), far above 100ms. At 100ms
+                EVERY relay STUN Binding (ICE consent, RFC 7675) times out before
+                its response returns; retransmits pile up until the agent logs
+                "Failed to send STUN Binding Request", consent freshness lapses,
+                and the connection tears down ~20-90s after connecting (media
+                keeps flowing right up to the drop because the data-plane Send
+                indications still work). Paired browser stats confirm this:
+                relay runs show ΔstunReq climbing with ΔstunResp=0.
+
+                500ms gives relay STUN transactions room to complete. It does cost
+                slower loss recovery on a lossy direct path, but the direct path
+                already succeeds at either value, whereas the relay path only
+                survives with the larger budget. This is exactly the "STUN/TURN
+                server is reliably slow (consistent high RTT)" case that warrants
+                raising it. Drop back to 100 only if you never use TURN relay.
+    endmenu
+
+    menu "DataChannel Test Mode"
+        config DATACHANNEL_TEST_MODE
+            bool "DataChannel test mode (no camera)"
+            default n
+            help
+                When enabled, skip camera init entirely and instead send a
+                counter message ("ping NNN from esp32") over the DataChannel
+                at a fixed interval. Use this to verify WebRTC signaling and
+                DataChannel connectivity without needing a working camera.
+
+        config DATACHANNEL_TEST_INTERVAL_MS
+            int "DataChannel test message interval (ms)"
+            default 500
+            range 50 10000
+            depends on DATACHANNEL_TEST_MODE
+            help
+                How often to send a test message when DataChannel test mode
+                is enabled.
+    endmenu
+endmenu

@@ -1,0 +1,57 @@
+# App image is larger than the default 1M factory partition.
+# CONFIG_PARTITION_TABLE_SINGLE_APP is not set
+# CONFIG_PARTITION_TABLE_SINGLE_APP_LARGE is not set
+# CONFIG_PARTITION_TABLE_TWO_OTA is not set
+# CONFIG_PARTITION_TABLE_TWO_OTA_LARGE is not set
+CONFIG_PARTITION_TABLE_CUSTOM=y
+# CSV filename is set per-target (sdkconfig.defaults.esp32 / .esp32s3) so each
+# board gets a partition table sized to its flash.
+CONFIG_PARTITION_TABLE_OFFSET=0x8000
+CONFIG_PARTITION_TABLE_MD5=y
+
+# Board-specific flash + PSRAM settings live in the per-target defaults files,
+# which IDF auto-merges on top of this one:
+#   sdkconfig.defaults.esp32    -> AI Thinker ESP32-CAM   (4MB flash, quad PSRAM)
+#   sdkconfig.defaults.esp32s3  -> XIAO ESP32S3 Sense     (8MB flash, octal PSRAM)
+# Pick the board with the build target; the camera pin map follows it:
+#   idf.py set-target esp32s3   (Seeed XIAO ESP32S3 Sense)
+#   idf.py set-target esp32     (AI Thinker ESP32-CAM)
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_160=y
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ=160
+
+# webrtc_peer_init() runs esp_peer_pre_generate_cert() (mbedtls EC keygen,
+# deep bignum call stack) directly on the main task. The 3584B default
+# overflows on ESP32-S3 (wider stack frames than ESP32). 8192 gives room.
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
+
+# WebRTC/DTLS support used by esp_peer.
+CONFIG_MBEDTLS_SSL_KEEP_PEER_CERTIFICATE=y
+CONFIG_MBEDTLS_SSL_PROTO_DTLS=y
+CONFIG_MBEDTLS_SSL_DTLS_SRTP=y
+# esp_peer self-signs a DTLS cert via mbedtls_x509write_crt_*; IDF 6 defaults
+# X509_CREATE_C off (it was on in 5.4), so enable it explicitly.
+CONFIG_MBEDTLS_X509_CREATE_C=y
+CONFIG_MBEDTLS_X509_CRT_WRITE_C=y
+# 1ms FreeRTOS tick (matches esp_peer peer_demo). At the default 100Hz/10ms
+# tick, the ICE agent's socket polling and STUN/TURN retransmit timing round to
+# coarse 10ms boundaries, which slows recovery from the brief UDP packet-loss
+# windows seen when gathering TURN relay candidates. 1000Hz makes that timing
+# 10x finer and noticeably more reliable on lossy paths.
+CONFIG_FREERTOS_HZ=1000
+# CONFIG_MBEDTLS_SSL_DTLS_CONNECTION_ID is not set
+# Route mbedTLS allocations to PSRAM, freeing internal RAM for camera DMA.
+CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y
+
+# Anedya SDK over ESP32 WiFi/MQTT.
+CONFIG_CONN_ANEDYA_MQTT=y
+CONFIG_AN_INTERFACE_ESP32_WIFI=y
+CONFIG_AN_MAX_CONCURRENT_TXN=10
+CONFIG_AN_TX_BUFFER=1024
+# RX buffer also sizes the esp-mqtt task stack (stack = AN_RX_BUFFER + 3112 in
+# the anedya wifi-mqtt interface). The WebRTC offer decode — base64 + inflate +
+# JSON parse — runs inside the MQTT command callback on that task, so 2048
+# (stack 5160) overflows on ESP32-S3. 4096 gives ~7.2KB, safe headroom.
+# NOTE: anedya_txn_t embeds _rxbody[AN_RX_BUFFER], so raising this also grows
+# every task that keeps a txn on its stack — the signaling tx / heartbeat task
+# stacks in anedya_signaling.c are sized for 4096.
+CONFIG_AN_RX_BUFFER=4096
