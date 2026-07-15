@@ -23,8 +23,8 @@ Turn an ESP32-Camera board into a real-time camera livestream device with Anedya
 
 ## 📷 Anedya - Camera Board Support
 
-| Board | Support Status  | Product Link |
-|---|---|--|--|
+| Board | Support Status | Product Link |
+|---|---|--|
 | ESP32-CAM | Supported | [Link](https://vdoc.ai-thinker.com/en/esp32-cam) |
 | DFRobot ESP32-S3 AI Camera | Supported | [Link](https://www.dfrobot.com/product-2899.html) |
 | Seed Studio XIAO ESP32S3 Sense | Supported | [Link](https://www.seeedstudio.com/XIAO-ESP32S3-Sense-p-5639.html) |
