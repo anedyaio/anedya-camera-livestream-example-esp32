@@ -101,7 +101,7 @@ This project does not use WebRTC RTP video tracks. Instead, camera JPEG frames a
 - AI Thinker ESP32-CAM (OV2640 or OV3660 camera module) + USB-to-serial programmer (e.g. FTDI, CP2102)
 
 **Software / Accounts**
-- [ESP-IDF](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/) v5.2 or later
+- [ESP-IDF](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/) v5.4.0 or later
 - An [Anedya](https://anedya.io?utm_source=github&utm_medium=link&utm_campaign=github-examples&utm_content=esp-cam) account
 
 ---
