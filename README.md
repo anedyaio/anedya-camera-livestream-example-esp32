@@ -16,17 +16,17 @@ Turn an ESP32-Camera board into a real-time camera livestream device with Anedya
 - **Signaling :** SDP offer/answer and ICE candidates exchanged via MQTT, no custom signaling server needed
 - **TURN Relay :** TURN server provided by Anedya to relay media streams.
 - **Live-Remote Video streaming :** Camera frames sent over WebRTC DataChannel. [View Here](https://anedyaio.github.io/anedya-camera-livestream-example-esp32/)
-- **Realtime Audio Support :** Support for audio streaming over WebRTC DataChannel.
+<!-- - **Realtime Audio Support :** Support for audio streaming over WebRTC DataChannel. -->
 
 ---
 
 ## 📷 Anedya - Camera Board Support
 
-| Board | Support Status | Example Project | Product Link |
+| Board | Support Status  | Product Link |
 |---|---|--|--|
-| ESP32-CAM | Supported | [Link](./anedya-camera-livestream-example-esp32-cam/)| [Link](https://vdoc.ai-thinker.com/en/esp32-cam) |
-| DFRobot ESP32-S3 AI Camera  | under testing | Link | [Link](https://www.dfrobot.com/product-2899.html) |
-| Seed Studio XIAO ESP32S3 Sense  | under testing | Link | [Link](https://www.seeedstudio.com/XIAO-ESP32S3-Sense-p-5639.html) |
+| ESP32-CAM | Supported | [Link](https://vdoc.ai-thinker.com/en/esp32-cam) |
+| DFRobot ESP32-S3 AI Camera | Supported | [Link](https://www.dfrobot.com/product-2899.html) |
+| Seed Studio XIAO ESP32S3 Sense | Supported | [Link](https://www.seeedstudio.com/XIAO-ESP32S3-Sense-p-5639.html) |
 
 ---
 
