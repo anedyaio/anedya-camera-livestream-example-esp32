@@ -34,3 +34,7 @@ secrets.h
 .devcontainer/
 .vscode/
 .env
+docs/
+.cache/
+sdkconfig
+.clangd

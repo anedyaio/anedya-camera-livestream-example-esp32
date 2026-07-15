@@ -37,7 +37,7 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           # Upload entire repository
-          path: './anedya-esp32-cam/test-peer'
+          path: './test-peer'
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
