@@ -16,10 +16,9 @@ Turn an ESP32-Camera board into a real-time camera livestream device with Anedya
 
 - **Signaling :** SDP offer/answer and ICE candidates exchanged via MQTT, no custom signaling server needed
 - **Peer to Peer with turn relay fallback :** Direct connection with webrtc with relay fallback of Anedya TURN server.
-<!-- - **TURN Relay :** TURN server provided by Anedya to relay media streams. -->
 - **Live-Remote Video streaming :** Camera frames sent over WebRTC DataChannel. [View Here](https://anedyaio.github.io/anedya-camera-livestream-example-esp32/)
+<!-- - **TURN Relay :** TURN server provided by Anedya to relay media streams. -->
 <!-- - **Realtime Audio Support :** Support for audio streaming over WebRTC DataChannel. -->
- 
 ---
 
 ## 📷 Anedya - Camera Board Support
@@ -236,9 +235,6 @@ Enable `CONFIG_DATACHANNEL_TEST_MODE` in menuconfig to skip camera init entirely
 
 ---
 
-
----
-
 ## 📚 References
 
 **Anedya**
@@ -257,13 +253,8 @@ Enable `CONFIG_DATACHANNEL_TEST_MODE` in menuconfig to skip camera init entirely
 - [espressif/esp32-camera](https://components.espressif.com/components/espressif/esp32-camera)
 - [ESP-IDF Getting Started](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/)
 
+---
+
 **Looking for other examples**
 
 - [Anedya Camera Livestream with Raspberry Pi](https://github.com/anedyaio/anedya-camera-livestream-example)
-
----
-
-
-## License
-
-This project is licensed under the [MIT](LICENSE).
