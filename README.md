@@ -255,6 +255,6 @@ Enable `CONFIG_DATACHANNEL_TEST_MODE` in menuconfig to skip camera init entirely
 
 ---
 
-**Looking for other examples**
+## 📑 Looking for other examples
 
-- [Anedya Camera Livestream with Raspberry Pi](https://github.com/anedyaio/anedya-camera-livestream-example)
+#### @ [Anedya Camera Livestream with Raspberry Pi](https://github.com/anedyaio/anedya-camera-livestream-example)
