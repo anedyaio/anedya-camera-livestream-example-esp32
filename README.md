@@ -11,14 +11,15 @@
 ![Camera View](./media/camera_view.png)
 
 Turn an ESP32-Camera board into a real-time camera livestream device with Anedya (Commands and TURN relay).
-
+ 
 ## ✨ Features
 
 - **Signaling :** SDP offer/answer and ICE candidates exchanged via MQTT, no custom signaling server needed
-- **TURN Relay :** TURN server provided by Anedya to relay media streams.
+- **Peer to Peer with turn relay fallback :** Direct connection with webrtc with relay fallback of Anedya TURN server.
+<!-- - **TURN Relay :** TURN server provided by Anedya to relay media streams. -->
 - **Live-Remote Video streaming :** Camera frames sent over WebRTC DataChannel. [View Here](https://anedyaio.github.io/anedya-camera-livestream-example-esp32/)
 <!-- - **Realtime Audio Support :** Support for audio streaming over WebRTC DataChannel. -->
-
+ 
 ---
 
 ## 📷 Anedya - Camera Board Support
@@ -197,13 +198,13 @@ idf.py -p /dev/ttyUSB0 flash monitor
 
 ### Step 5: Connect a Viewer
 
-Open the browser viewer (included in the companion viewer repository or hosted version), then:
+Open the browser viewer (included in the companion viewer repository or [hosted version](https://anedyaio.github.io/anedya-camera-livestream-example-esp32)), then:
 
 1. Click **Settings**
 2. Enter your **Node ID** and **Platform API key**
 3. Click **Start Stream**
 
-The viewer fetches TURN credentials from Anedya, writes an offer to ValueStore, and waits for the ESP32 to answer. Once the DataChannel opens, JPEG frames appear in the browser.
+The viewer fetches TURN credentials from Anedya, writes an offer to commands, and waits for the ESP32 to answer. Once the DataChannel opens, JPEG frames appear in the browser.
 
 ---
 
