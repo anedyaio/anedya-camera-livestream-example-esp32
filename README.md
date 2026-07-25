@@ -8,7 +8,7 @@
 
 # ESP32- WebRTC Camera Livestream with Anedya
 
-![Camera View](./media/camera_view.png)
+![Camera View](./media/DFrobot_camera_view.png)
 
 Turn an ESP32-Camera board into a real-time camera livestream device with Anedya (Commands and TURN relay).
  
