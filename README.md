@@ -26,7 +26,7 @@ Turn an ESP32-Camera board into a real-time camera livestream device with Anedya
 | Framework / Platform | Status |
 |---|---|
 | ESP-IDF | [Available](./ESP-IDF/) |
-| PlatformIO (Ardiuno) | [Available](./Platformio/) |
+| PlatformIO (Ardiuno) | [Available](./PlatformIO/) |
 
 ---
 
