@@ -1,8 +1,14 @@
 [<img src="https://img.shields.io/badge/Anedya-Documentation-blue?style=for-the-badge">](https://docs.anedya.io?utm_source=github&utm_medium=link&utm_campaign=github-examples&utm_content=esp-cam)
 [<img src="https://img.shields.io/badge/Peer-Live-blue?style=for-the-badge">](https://anedyaio.github.io/anedya-camera-livestream-example-esp32/)
 
+<p align="center">
+    <img src="https://cdn.anedya.io/anedya_black_banner.png" alt="Logo">
+</p>
+
+
 # ESP32- WebRTC Camera Livestream with Anedya (PlatformIO)
 
+![Camera View](./media/DFrobot_camera_view.png)
 Turn an ESP32-Camera board into a real-time camera livestream device with Anedya (Commands and TURN relay).
 
 ## ✨ Features
