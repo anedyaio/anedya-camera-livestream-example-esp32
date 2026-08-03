@@ -38,3 +38,12 @@ docs/
 .cache/
 sdkconfig
 .clangd
+
+*.pio/
+*.vscode/
+managed_components/
+dependencies.lock
+sdkconfig
+sdkconfig.old
+build/
+CMakeLists.txt.user

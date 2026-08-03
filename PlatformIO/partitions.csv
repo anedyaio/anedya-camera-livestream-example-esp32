@@ -1,0 +1,7 @@
+# Partition table for ESP32-CAM style boards — 4 MB flash, no OTA.
+# The WebRTC + camera + TLS build is well over the 1 MB default app partition,
+# so the factory app takes everything after bootloader/NVS/PHY.
+# Name,   Type, SubType, Offset,  Size,     Flags
+nvs,      data, nvs,     0x9000,  0x6000,
+phy_init, data, phy,     0xf000,  0x1000,
+factory,  app,  factory, 0x10000, 0x3F0000,
