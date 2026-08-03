@@ -21,7 +21,7 @@ Turn an ESP32-Camera board into a real-time camera livestream device with Anedya
 <!-- - **Realtime Audio Support :** Support for audio streaming over WebRTC DataChannel. -->
 ---
 
-## Supported Development Environments - Examples
+## 📋 Supported Development Environments
 
 | Framework / Platform | Status |
 |---|---|
