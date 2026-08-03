@@ -292,6 +292,6 @@ Consequences, both handled in the code:
 - [WebRTC Overview](https://webrtc.org/getting-started/overview)
 
 ---
-## **Other examples**
+## 📑 Other examples
 - [ESP-IDF version of this example](./../ESP-IDF/)
 - [Anedya Camera Livestream with Raspberry Pi](https://github.com/anedyaio/anedya-camera-livestream-example)
