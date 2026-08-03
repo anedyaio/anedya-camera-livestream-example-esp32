@@ -291,6 +291,7 @@ Consequences, both handled in the code:
 - [espressif/esp32-camera](https://components.espressif.com/components/espressif/esp32-camera)
 - [WebRTC Overview](https://webrtc.org/getting-started/overview)
 
-**Other examples**
+---
+## **Other examples**
 - [ESP-IDF version of this example](./../ESP-IDF/)
 - [Anedya Camera Livestream with Raspberry Pi](https://github.com/anedyaio/anedya-camera-livestream-example)
