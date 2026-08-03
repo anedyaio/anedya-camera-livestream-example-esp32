@@ -1,10 +1,19 @@
 # =============================================================================
-# sdkconfig.defaults — Seeed Studio XIAO ESP32S3 Sense
+# sdkconfig.defaults — settings common to every supported board.
 #
 # These are the ESP-IDF knobs the Arduino IDE cannot set, which is exactly why
 # this example is a PlatformIO arduino+espidf project. Every value here is
 # carried over from the ESP-IDF version of this example, where it was tuned
 # against the Anedya TURN relay.
+#
+# Board-specific settings (flash size, PSRAM mode, console, partition table)
+# live in the per-target files, which ESP-IDF merges on top of this one
+# automatically based on the build target:
+#   sdkconfig.defaults.esp32s3  -> Seeed XIAO ESP32S3 Sense  (8 MB flash, octal PSRAM)
+#   sdkconfig.defaults.esp32    -> ESP32-CAM style boards    (4 MB flash, quad PSRAM)
+# Pick the board by choosing the PlatformIO environment:
+#   pio run -e seeed_xiao_esp32s3
+#   pio run -e esp32cam
 # =============================================================================
 
 # --- Arduino ----------------------------------------------------------------
@@ -14,40 +23,16 @@ CONFIG_AUTOSTART_ARDUINO=y
 # The 8 KB default is tight once PubSubClient's TLS write path and the offer
 # decode (ArduinoJson + inflate) are on it.
 CONFIG_ARDUINO_LOOP_STACK_SIZE=16384
-# Leave ESP_LOGx going to the ESP-IDF console (see console section below) so
-# our logs and esp_peer's/esp32-camera's land on the same port, in order.
+# Leave ESP_LOGx going to the ESP-IDF console so our logs and
+# esp_peer's/esp32-camera's land on the same port, in order.
 # CONFIG_ARDUHAL_ESP_LOG is not set
 
-# --- Console ----------------------------------------------------------------
-# XIAO ESP32S3 has no USB-UART bridge; the USB-C port is the ESP32-S3's own
-# USB peripheral. ARDUINO_USB_MODE=1 (set by the board definition) makes Serial
-# the USB Serial/JTAG controller, so point the IDF console there too.
-CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
-
-# --- Flash / partitions -----------------------------------------------------
-CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y
-CONFIG_ESPTOOLPY_FLASHSIZE="8MB"
-CONFIG_ESPTOOLPY_HEADER_FLASHSIZE_UPDATE=y
+# --- Partitions -------------------------------------------------------------
+# The CSV filename is set per-target (sdkconfig.defaults.esp32 / .esp32s3) so
+# each board gets a table sized to its flash.
 CONFIG_PARTITION_TABLE_CUSTOM=y
-CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
-CONFIG_PARTITION_TABLE_FILENAME="partitions.csv"
 CONFIG_PARTITION_TABLE_OFFSET=0x8000
 CONFIG_PARTITION_TABLE_MD5=y
-
-# --- PSRAM ------------------------------------------------------------------
-# Mandatory. A single HVGA JPEG frame buffer is far larger than the free
-# internal DRAM; without PSRAM esp_camera_init() fails outright.
-# The XIAO ESP32S3 uses OCTAL SPI PSRAM — quad mode means "no PSRAM found".
-CONFIG_SPIRAM=y
-CONFIG_SPIRAM_MODE_OCT=y
-CONFIG_SPIRAM_TYPE_AUTO=y
-CONFIG_SPIRAM_SPEED_80M=y
-CONFIG_SPIRAM_SPEED=80
-CONFIG_SPIRAM_BOOT_INIT=y
-CONFIG_SPIRAM_USE_MALLOC=y
-# Small allocations stay in internal RAM (DMA-capable); big ones go to PSRAM.
-CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=16384
-CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL=32768
 
 # --- mbedTLS / DTLS (esp_peer) ----------------------------------------------
 # esp_peer needs DTLS plus the DTLS-SRTP extension, and self-signs its own
@@ -88,8 +73,6 @@ CONFIG_MBEDTLS_KEY_EXCHANGE_PSK=y
 CONFIG_FREERTOS_HZ=1000
 
 # --- Misc -------------------------------------------------------------------
-CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
-CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ=240
 # esp_peer_pre_generate_cert() (mbedTLS EC keygen, deep bignum call stack) runs
 # from the app entry task before loop() starts.
 CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192

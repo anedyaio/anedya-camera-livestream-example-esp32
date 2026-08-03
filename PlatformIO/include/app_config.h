@@ -20,7 +20,7 @@
 // 1. WiFi
 // -----------------------------------------------------------------------------
 #define WIFI_SSID     "ssid"
-#define WIFI_PASSWORD "Wifi0101"
+#define WIFI_PASSWORD "password"
 
 // -----------------------------------------------------------------------------
 // 2. Anedya device credentials  (Anedya console -> Node details)
@@ -28,8 +28,8 @@
 // Device ID  — the node's UUID.
 // Connection Key — the node's secret.
 // The Node ID is NOT needed here; it is entered in the browser viewer.
-#define ANEDYA_DEVICE_ID "843e3967-d641-4fc6-9ec5-6959a936f670"
-#define ANEDYA_CONNECTION_KEY "6f962015d7e7ef0f5457c853b716838d"
+#define ANEDYA_DEVICE_ID "YOUR_DEVICE_ID_HERE"
+#define ANEDYA_CONNECTION_KEY "YOUR_CONNECTION_KEY_HERE"
 
 // Anedya region code. Full list: https://docs.anedya.io/device/#region
 #define ANEDYA_REGION_CODE "ap-in-1"
@@ -46,9 +46,22 @@
 // -----------------------------------------------------------------------------
 // 3. Board
 // -----------------------------------------------------------------------------
-// Pick the camera pin map. Only one may be defined; see camera_pins.h.
+// Normally you do NOT edit this — the board comes from the PlatformIO
+// environment you build, which passes the macro as a build flag:
+//
+//   pio run -e seeed_xiao_esp32s3            ->  -DCAMERA_MODEL_XIAO_ESP32S3
+//   pio run -e dfrobot_firebeetle2_esp32s3   ->  -DCAMERA_MODEL_DFROBOT_ESP32S3
+//   pio run -e dfrobot_romeo_esp32s3         ->  -DCAMERA_MODEL_DFROBOT_ESP32S3
+//   pio run -e esp32cam                      ->  -DCAMERA_MODEL_AI_THINKER
+//   pio run -e dfrobot_ai_camera             ->  -DCAMERA_MODEL_DFROBOT_AI_CAMERA
+//
+// That also picks up the right flash size, PSRAM mode and partition table via
+// sdkconfig.defaults.<target>. Building outside those environments falls back
+// to the XIAO map. Pin maps live in camera_pins.h.
+#if !defined(CAMERA_MODEL_XIAO_ESP32S3) && !defined(CAMERA_MODEL_DFROBOT_ESP32S3) && \
+    !defined(CAMERA_MODEL_AI_THINKER) && !defined(CAMERA_MODEL_DFROBOT_AI_CAMERA)
 #define CAMERA_MODEL_XIAO_ESP32S3
-// #define CAMERA_MODEL_AI_THINKER
+#endif
 
 // -----------------------------------------------------------------------------
 // 4. Camera stream profile
@@ -62,6 +75,7 @@
 // PSRAM frame buffers. With 2+ the DVP DMA runs continuously; 1 stops/starts it
 // per frame and roughly halves throughput.
 #define CAMERA_STREAM_FB_COUNT     2
+
 // Sensor master clock.
 #define CAMERA_STREAM_XCLK_HZ      20000000
 // Software rate limiter for the capture loop. Actual FPS at the browser is
@@ -89,9 +103,10 @@
 // The device only receives small control strings from the browser.
 #define WEBRTC_RECV_CACHE_SIZE      8192
 // How long esp_peer keeps a frame in the send cache before dropping it as
-// stale. 50 ms suits a direct path; on the relay a frame legitimately takes
-// 200-500 ms to drain, so 50 ms would discard perfectly deliverable frames.
-#define WEBRTC_CACHE_TIMEOUT_MS     200
+// stale. Set to 10000 (10 seconds) so esp_peer NEVER drops packets internally. 
+// Dropping un-ACKed packets on a reliable DataChannel breaks the stream!
+// We only want to drop NEW frames at the application layer via WOULD_BLOCK.
+#define WEBRTC_CACHE_TIMEOUT_MS     10000
 // Max time the ICE agent blocks in recv() per loop tick — also bounds the
 // STUN/TURN retransmit delay. 100 ms is ideal for a direct path, but relay RTT
 // is 200-1100 ms, so at 100 ms *every* relay consent Binding times out before
