@@ -6,7 +6,7 @@
     <img src="https://cdn.anedya.io/anedya_black_banner.png" alt="Logo">
 </p>
 
-# ESP32- WebRTC Camera Livestream with Anedya
+# ESP32- WebRTC Camera Livestream with Anedya (ESP-IDF)
 
 ![Camera View](./media/DFrobot_camera_view.png)
 
@@ -100,6 +100,7 @@ This project does not use WebRTC RTP video tracks. Instead, camera JPEG frames a
 **Hardware** (either board)
 - Seeed Studio XIAO ESP32S3 Sense (built-in OV2640 camera, native USB — no programmer needed), or
 - AI Thinker ESP32-CAM (OV2640 or OV3660 camera module) + USB-to-serial programmer (e.g. FTDI, CP2102)
+- DFrobot ESP32 S3 AI Thinker Camera (built-in OV3660 camera, native USB — no programmer needed)
 
 **Software / Accounts**
 - [ESP-IDF](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/) v5.4.0 or later
